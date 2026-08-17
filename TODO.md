@@ -110,37 +110,37 @@ stable result set from SearXNG.
 
 **Work:**
 
-- [ ] Define the search request, result, suggestion, and unavailable-engine
+- [x] Define the search request, result, suggestion, and unavailable-engine
   types described in the roadmap.
-- [ ] Add `reqwest` and URL-handling dependencies at released versions and
+- [x] Add `reqwest` and URL-handling dependencies at released versions and
   configure one reusable async SearXNG HTTP client.
-- [ ] Apply defaults and validate query length, result limit, page, time range,
+- [x] Apply defaults and validate query length, result limit, page, time range,
   safe-search level, categories, engines, and domain lists in one shared entry
   point.
-- [ ] Encode valid requests for the SearXNG JSON API and preserve query text
+- [x] Encode valid requests for the SearXNG JSON API and preserve query text
   exactly.
-- [ ] Normalize upstream fields, reject invalid result URLs, deduplicate by
+- [x] Normalize upstream fields, reject invalid result URLs, deduplicate by
   normalized URL, and preserve upstream rank.
-- [ ] Apply include/exclude filters with exact-host or subdomain matching after
+- [x] Apply include/exclude filters with exact-host or subdomain matching after
   results return.
-- [ ] Preserve useful results when SearXNG also reports unavailable engines.
-- [ ] Map timeouts, malformed responses, and backend failures to actionable
+- [x] Preserve useful results when SearXNG also reports unavailable engines.
+- [x] Map timeouts, malformed responses, and backend failures to actionable
   application errors.
-- [ ] Add isolated HTTP fixture coverage with a local test server whose response
+- [x] Add isolated HTTP fixture coverage with a local test server whose response
   bodies and status codes are controlled by the test.
-- [ ] Gate one ignored integration test behind an explicit SearXNG endpoint and
+- [x] Gate one ignored integration test behind an explicit SearXNG endpoint and
   run it against the T02 stack.
 
 **Acceptance criteria:**
 
-- [ ] Empty or out-of-range inputs fail locally and use the roadmap's defaults
+- [x] Empty or out-of-range inputs fail locally and use the roadmap's defaults
   when omitted.
-- [ ] A filtered result never escapes its domain rule through suffix matching,
+- [x] A filtered result never escapes its domain rule through suffix matching,
   mixed case, or an explicit port.
-- [ ] Optional empty fields are omitted from JSON output.
-- [ ] Table-driven tests cover encoding, validation, deduplication, ordering,
+- [x] Optional empty fields are omitted from JSON output.
+- [x] Table-driven tests cover encoding, validation, deduplication, ordering,
   filtering, partial engine failures, and cancellation.
-- [ ] A real JSON search through the local stack normalizes successfully.
+- [x] A real JSON search through the local stack normalizes successfully.
 
 **Verification:** `cargo test search`, then run the ignored search integration
 test against the T02 endpoint with its documented environment variable.

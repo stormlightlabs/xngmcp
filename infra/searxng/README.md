@@ -51,6 +51,19 @@ docker compose --env-file infra/searxng/.env \
 
 Repeat the health and JSON search commands under "Start and verify."
 
+## Run the search integration test
+
+After the JSON smoke check succeeds, point the ignored search test at this
+stack:
+
+```sh
+XNGMCP_TEST_SEARXNG_URL=http://127.0.0.1:8080 \
+  cargo test search_integration -- --ignored
+```
+
+Set the URL to the configured loopback port when `SEARXNG_PORT` differs from
+8080.
+
 ## Stop or remove the stack
 
 Stop and remove the containers while retaining the Valkey cache volume:

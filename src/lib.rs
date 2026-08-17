@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+pub mod web;
 
 use std::{io, process::ExitCode};
 

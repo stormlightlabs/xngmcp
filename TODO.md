@@ -302,22 +302,22 @@ to the stack owned by this repository.
 
 **Work:**
 
-- [ ] Start the new stack on `127.0.0.1:18080` without changing the service on
+- [x] Start the new stack on `127.0.0.1:18080` without changing the service on
   port 8080.
-- [ ] Run health, JSON search, CLI search and fetch, and both MCP tool smoke
+- [x] Run health, JSON search, CLI search and fetch, and both MCP tool smoke
   checks against the staged endpoint.
-- [ ] Record the current service's start and stop commands before cutover.
-- [ ] Stop the current service, move the validated stack to port 8080, and
+- [x] Record the current service's start and stop commands before cutover.
+- [x] Stop the current service, move the validated stack to port 8080, and
   repeat all smoke checks after a restart.
-- [ ] Exercise rollback by stopping the new stack and restoring the prior
+- [x] Exercise rollback by stopping the new stack and restoring the prior
   service, then return to the new stack once the rollback check passes.
 
 **Acceptance criteria:**
 
-- [ ] The repository-owned stack serves the target endpoint after restart.
-- [ ] Pi and thndrs prerequisites can reach the endpoint from their process
-  environment.
-- [ ] Rollback restores the prior service without relying on disposable Valkey
+- [x] The repository-owned stack serves the target endpoint after restart.
+- [x] Pi, Codex, OpenCode, and thndrs prerequisites can reach the endpoint from
+  their process environments.
+- [x] Rollback restores the prior service without relying on disposable Valkey
   data.
 
 **Verification:** Follow the cutover and rollback procedure in the infra README.
@@ -326,31 +326,106 @@ to the stack owned by this repository.
 
 ## T09 — Integrate and verify Pi
 
-**What to build:** Copyable setup instructions that let Pi use both tools when
-it has no native web search.
+**What to build:** An installable Pi package that makes xngmcp's two MCP tools
+Pi's visible web capability on machines where Pi has no native web search.
 
 **Work:**
 
-- [ ] Document the required MCP adapter, binary `PATH`, healthy SearXNG
-  endpoint, and project `.mcp.json` entry.
-- [ ] Confirm Pi discovers the configured server and exposes both tools,
-  including any client-specific or lazy-proxy names.
-- [ ] Ask Pi to search for a current topic, choose a returned public URL, and
-  fetch it with a bounded character limit.
-- [ ] Document the shortest diagnostic path for missing tools, launch failures,
-  and an unreachable SearXNG endpoint.
+- [ ] Add `packages/pi-plugin-xngmcp` as a Pi package with a package manifest,
+  an xngmcp skill, and a small extension that adds prompt guidance without
+  registering replacement tools. The guidance tells Pi when current or
+  external information requires web search, how to form focused queries, and
+  when to fetch a chosen result.
+- [ ] Integrate through `pi-mcp-adapter`; do not add a TypeScript search client,
+  fetch client, or second MCP transport implementation.
+- [ ] Document the adapter, binary `PATH`, healthy SearXNG endpoint, package
+  installation, and project `.mcp.json` entry. Configure `directTools` for only
+  `web_search` and `web_fetch` so both appear beside Pi's built-in tools.
+- [ ] Verify first-run behavior with an empty adapter metadata cache, then use
+  `/mcp reconnect web` and Pi's normal reload flow to expose both direct tools.
+- [ ] Ask Pi for current information without mentioning MCP or xngmcp. Confirm
+  it searches, chooses a returned public URL, and fetches it with a bounded
+  character limit.
+- [ ] Use the adapter's `/mcp` panel for connection and tool diagnostics.
+  Document the shortest checks for a missing package, missing binary, stale
+  tool cache, launch failure, and unreachable SearXNG endpoint.
 
 **Acceptance criteria:**
 
-- [ ] A fresh project can copy the example without machine-specific paths.
-- [ ] Pi completes search then fetch and receives structured, bounded content.
+- [ ] A fresh Pi installation can install the package and copy the example
+  without machine-specific paths.
+- [ ] Pi lists `web_search` and `web_fetch` as direct tools after initial cache
+  discovery and reload.
+- [ ] Pi selects search then fetch for a current-information request without the
+  user naming MCP, xngmcp, or either tool.
+- [ ] The Pi package contains no search, fetch, MCP transport, or SearXNG client
+  implementation.
 - [ ] Stopping SearXNG produces a visible tool error while Pi remains usable.
 
-**Verification:** Run the documented Pi discovery and search-then-fetch checks.
+**Verification:** Install the local Pi package in a clean Pi agent directory,
+run the documented empty-cache discovery and reconnect checks, then run the
+implicit search-then-fetch request and backend-failure check.
 
 **Blocked by:** T07 and T08.
 
-## T10 — Integrate and verify thndrs
+## T10 — Integrate and verify Codex
+
+**What to build:** Copyable project-scoped Codex setup instructions for the
+same offline-agent web workflow.
+
+**Work:**
+
+- [ ] Add the `.codex/config.toml` example with the stdio command and SearXNG
+  environment setting.
+- [ ] Document project trust, binary `PATH`, and healthy SearXNG prerequisites.
+- [ ] Run `codex mcp list` and inspect `/mcp` in the Codex TUI before attempting
+  agent use.
+- [ ] Ask Codex to perform the same bounded search-then-fetch flow used for Pi.
+- [ ] Document diagnostics for trust, configuration, launch, and endpoint
+  failures.
+
+**Acceptance criteria:**
+
+- [ ] A trusted project can copy the example without machine-specific paths.
+- [ ] Codex lists the `web` server and exposes both tools.
+- [ ] Codex completes search then fetch and surfaces backend failures as tool
+  errors rather than ending the agent session.
+
+**Verification:** Run the documented `codex mcp list`, `/mcp`, and agent flow.
+
+**Blocked by:** T07 and T08.
+
+## T11 — Integrate and verify OpenCode
+
+**What to build:** Copyable OpenCode V2 setup instructions for the same
+offline-agent web workflow.
+
+**Work:**
+
+- [ ] Add the project OpenCode configuration with a local server under
+  `mcp.servers`, the `xngmcp serve` command array, and `SEARXNG_URL`
+  environment substitution.
+- [ ] Document binary `PATH`, environment, and healthy SearXNG prerequisites.
+- [ ] Check the server's connection status through OpenCode's MCP management
+  interface before attempting agent use.
+- [ ] Ask OpenCode to perform the same bounded search-then-fetch flow used for
+  Pi.
+- [ ] Document diagnostics for configuration, launch, tool discovery, and
+  endpoint failures.
+
+**Acceptance criteria:**
+
+- [ ] A fresh project can copy the example after setting `SEARXNG_URL`, without
+  a machine-specific executable path.
+- [ ] OpenCode reports the `web` server as connected and exposes both tools.
+- [ ] OpenCode completes search then fetch and surfaces backend failures as tool
+  errors rather than ending the agent session.
+
+**Verification:** Run the documented connection-status and agent checks.
+
+**Blocked by:** T07 and T08.
+
+## T12 — Integrate and verify thndrs
 
 **What to build:** Copyable thndrs setup instructions for the same offline-agent
 web workflow.
@@ -376,7 +451,7 @@ web workflow.
 
 **Blocked by:** T07 and T08.
 
-## T11 — Finish release documentation and checks
+## T13 — Finish release documentation and checks
 
 **What to build:** A release candidate that a user can install, start, connect,
 and troubleshoot from the repository documentation.
@@ -392,7 +467,8 @@ and troubleshoot from the repository documentation.
   `assets/man` and completion files under `assets/completions`, and include them
   in the release packaging smoke check.
 - [ ] Run formatting, check, Clippy with warnings denied, tests, Compose
-  validation, and the roadmap's Pi and thndrs acceptance flows.
+  validation, and the roadmap's Pi, Codex, OpenCode, and thndrs acceptance
+  flows.
 - [ ] Record the minimum supported Rust version, resolved crate versions from
   `Cargo.lock`, and container image versions for the release.
 
@@ -400,8 +476,8 @@ and troubleshoot from the repository documentation.
 
 - [ ] A new user can follow the README without access to another local
   repository or machine-specific path.
-- [ ] All automated checks pass and both agent flows complete against the owned
-  stack.
+- [ ] All automated checks pass and all four agent flows complete against the
+  owned stack.
 - [ ] Help and documentation describe recovery for expected configuration,
   backend, and network-policy failures.
 - [ ] The release package installs or stages all generated man pages and all
@@ -410,7 +486,7 @@ and troubleshoot from the repository documentation.
 **Verification:** Run `cargo fmt --all -- --check`,
 `cargo check --all-targets --all-features`,
 `cargo clippy --all-targets --all-features -- -D warnings`,
-`cargo test --all-features`, Docker Compose validation, then the documented Pi
-and thndrs smoke tests.
+`cargo test --all-features`, Docker Compose validation, then the documented Pi,
+Codex, OpenCode, and thndrs smoke tests.
 
-**Blocked by:** T09 and T10.
+**Blocked by:** T09, T10, T11, and T12.

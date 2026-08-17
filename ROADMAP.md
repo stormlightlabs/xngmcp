@@ -5,13 +5,14 @@
 xngmcp will give coding agents a small, dependable web capability backed by a
 private SearXNG instance. The same binary will work in three contexts:
 
-- as a stdio MCP server for Pi, thndrs, and other MCP clients;
+- as a stdio MCP server for Pi, Codex, OpenCode, thndrs, and other MCP clients;
 - as a human-friendly command-line tool for testing and direct use; and
 - as a machine-friendly CLI with stable JSON output for scripts.
 
-Version 0.1 is complete when Pi and thndrs can discover and call `web_search`
-and `web_fetch`, both tools return bounded structured results, and the Docker
-stack in this repository is serving the machine's local SearXNG endpoint.
+Version 0.1 is complete when Pi, Codex, OpenCode, and thndrs can discover and
+call `web_search` and `web_fetch`, both tools return bounded structured results,
+and the Docker stack in this repository is serving the machine's local SearXNG
+endpoint.
 
 ## Product boundary
 
@@ -28,7 +29,9 @@ stack in this repository is serving the machine's local SearXNG endpoint.
   server-side request forgery (SSRF).
 - A self-contained `infra/searxng` Docker Compose stack using SearXNG and
   Valkey, bound to loopback by default.
-- Setup and verification examples for Pi and thndrs.
+- An xngmcp Pi package that supplies Pi-facing guidance and setup for the two
+  direct tools exposed through `pi-mcp-adapter`.
+- Setup and verification examples for Pi, Codex, OpenCode, and thndrs.
 
 ### Deliberately out of scope
 
@@ -38,7 +41,7 @@ stack in this repository is serving the machine's local SearXNG endpoint.
 - Tool variants such as `search_news`, `search_images`, or `get_engines`.
 - MCP resources, prompts, and a capabilities resource.
 - A cache in the Rust process; SearXNG and Valkey own search-side caching.
-- Changes to Pi or thndrs themselves.
+- Changes to Pi, Codex, OpenCode, or thndrs themselves.
 
 `web_search_many` is a possible 0.2 addition only if real agent use shows that
 the extra tool and concurrency policy reduce turns enough to justify them.
@@ -275,6 +278,10 @@ infra/searxng/
   compose.yaml
   settings.yml
   README.md
+packages/pi-plugin-xngmcp/
+  package.json
+  extensions/index.ts
+  skills/xngmcp/SKILL.md
 ```
 
 This is one Cargo package with one library target and one thin binary target,
@@ -383,7 +390,7 @@ Acceptance:
   logging is enabled.
 - Closing stdin or sending a cancellation signal stops the server cleanly.
 
-### Milestone 4: agent integration and release readiness
+### Milestone 4: cutover and Pi integration
 
 Cut over only after the CLI and MCP server pass against the staged stack:
 
@@ -395,8 +402,15 @@ Cut over only after the CLI and MCP server pass against the staged stack:
 4. Exercise rollback before retiring the prior deployment configuration. No
    data migration is required because Valkey contains disposable cache data.
 
-Document local installation and add copyable MCP configurations. Pi uses its
-installed MCP adapter with a project `.mcp.json` entry:
+Ship an installable Pi package for machines where Pi has no native web search.
+The package includes a small skill and prompt guidance that tell Pi when to
+search, how to keep queries focused, and when to fetch a selected result. Its
+extension does not register replacement web tools. It uses `pi-mcp-adapter`
+for MCP discovery and calls.
+
+Document local installation and add a copyable project `.mcp.json` entry. The
+Pi configuration promotes xngmcp's two tools into Pi's direct tool list while
+leaving other MCP servers on the adapter's lazy proxy:
 
 ```json
 {
@@ -406,11 +420,87 @@ installed MCP adapter with a project `.mcp.json` entry:
             "args": ["serve"],
             "env": {
                 "SEARXNG_URL": "http://127.0.0.1:8080"
+            },
+            "directTools": ["web_search", "web_fetch"]
+        }
+    }
+}
+```
+
+Use the adapter's `/mcp` panel and reconnect command for setup and diagnostics
+instead of adding a second xngmcp-specific connection UI. Document checks for
+the package, binary `PATH`, server connection, direct-tool cache, and SearXNG
+health. The first session may expose only the lazy proxy until
+`/mcp reconnect web` populates the adapter's tool cache and reloads Pi.
+
+Acceptance:
+
+- The repository-owned stack serves port 8080 after restart, and the tested
+  rollback restores the prior local service.
+- A fresh Pi installation can install the package and copy the MCP example
+  without machine-specific paths.
+- Pi lists `web_search` and `web_fetch` as direct tools, uses them for a current
+  topic without the user naming MCP, and fetches one returned public URL with a
+  bounded character limit.
+- The package contains no search, fetch, MCP transport, or SearXNG client
+  implementation; those behaviors remain in xngmcp and `pi-mcp-adapter`.
+
+### Milestone 5: Codex integration
+
+Document a project-scoped `.codex/config.toml` entry for trusted projects. The
+entry starts xngmcp over stdio and forwards the SearXNG endpoint:
+
+```toml
+[mcp_servers.web]
+command = "xngmcp"
+args = ["serve"]
+env = { SEARXNG_URL = "http://127.0.0.1:8080" }
+```
+
+Verify the configured server with `codex mcp list` and the active server and
+tool state with `/mcp` in the Codex TUI before asking Codex to search and fetch.
+
+Acceptance:
+
+- A trusted project can use the example without machine-specific paths.
+- Codex lists the `web` server and both tools.
+- Codex completes the bounded search-then-fetch flow and reports backend
+  failures as tool errors.
+
+### Milestone 6: OpenCode integration
+
+Document a project OpenCode V2 configuration. OpenCode starts local MCP servers
+over stdio and reads environment substitutions while loading the configuration:
+
+```json
+{
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "servers": {
+            "web": {
+                "type": "local",
+                "command": ["xngmcp", "serve"],
+                "environment": {
+                    "SEARXNG_URL": "{env:SEARXNG_URL}"
+                }
             }
         }
     }
 }
 ```
+
+Verify the server's connection status through OpenCode's MCP management
+interface before asking the agent to search and fetch.
+
+Acceptance:
+
+- A fresh project can use the example after setting `SEARXNG_URL`, with no
+  machine-specific executable path.
+- OpenCode reports the `web` server as connected and exposes both tools.
+- OpenCode completes the bounded search-then-fetch flow and reports backend
+  failures as tool errors.
+
+### Milestone 7: thndrs integration and release readiness
 
 thndrs uses a project `.thndrs/mcp.toml` entry:
 
@@ -431,12 +521,10 @@ names or through Pi's lazy MCP proxy.
 
 Acceptance:
 
-- The repository-owned stack serves port 8080 after restart, and the tested
-  rollback restores the prior local service.
-- Pi discovers the server, searches for a current topic, fetches one returned
-  public URL, and receives bounded content without native web-search support.
 - thndrs passes `mcp test web`, lists both tools, and completes the same
   search-then-fetch flow after project trust is granted.
+- Pi, Codex, OpenCode, and thndrs each complete their documented integration
+  flow against the repository-owned stack.
 - `cargo fmt --all -- --check`, `cargo check --all-targets --all-features`,
   `cargo clippy --all-targets --all-features -- -D warnings`,
   `cargo test --all-features`, and Docker configuration validation pass.
@@ -470,3 +558,5 @@ Acceptance:
 - [SearXNG search API](https://docs.searxng.org/dev/search_api.html)
 - [SearXNG container installation](https://docs.searxng.org/admin/installation-docker.html)
 - [SearXNG settings](https://docs.searxng.org/admin/settings/settings.html)
+- [Codex MCP configuration](https://developers.openai.com/codex/mcp)
+- [OpenCode MCP servers](https://opencode.ai/v2/docs/mcp-servers)

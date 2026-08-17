@@ -69,12 +69,12 @@ result, and fetch it with a proportionate `max_chars` limit.
 
 ## Diagnose a failed setup
 
-| Symptom | Check |
-| --- | --- |
-| Package is absent | `pi list`, then install `pi-mcp-adapter` and `pi-plugin-xngmcp`. |
-| `xngmcp` will not start | Run `command -v xngmcp`; put the installed binary on `PATH`. |
-| Tools are missing or stale | Run `/mcp reconnect web`, then `/reload`. |
-| Server launch failed | Open `/mcp`. Set `"debug": true` on `web` temporarily, reconnect, and inspect the displayed stderr. |
+| Symptom                          | Check                                                                                                          |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Package is absent                | `pi list`, then install `pi-mcp-adapter` and `pi-plugin-xngmcp`.                                               |
+| `xngmcp` will not start          | Run `command -v xngmcp`; put the installed binary on `PATH`.                                                   |
+| Tools are missing or stale       | Run `/mcp reconnect web`, then `/reload`.                                                                      |
+| Server launch failed             | Open `/mcp`. Set `"debug": true` on `web` temporarily, reconnect, and inspect the displayed stderr.            |
 | Search backend cannot be reached | Run the health check, verify `SEARXNG_URL`, and reconnect. Pi reports this as a tool error and remains usable. |
 
 Use the `/mcp` panel for connection and tool diagnostics rather than adding a

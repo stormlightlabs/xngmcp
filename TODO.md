@@ -235,28 +235,28 @@ service.
 
 **Work:**
 
-- [ ] Derive `serde::Deserialize` and `schemars::JsonSchema` for the shared
+- [x] Derive `serde::Deserialize` and `schemars::JsonSchema` for the shared
   search input and register `web_search` with rmcp's tool macros and an
   agent-oriented description.
-- [ ] Add released `rmcp` server and stdio transport features plus `schemars`,
+- [x] Add released `rmcp` server and stdio transport features plus `schemars`,
   using the Tokio runtime already established by T01.
-- [ ] Map every tool field to the shared search request and return its result as
+- [x] Map every tool field to the shared search request and return its result as
   structured content with a concise text fallback.
-- [ ] Return invalid inputs and expected SearXNG failures as tool errors rather
+- [x] Return invalid inputs and expected SearXNG failures as tool errors rather
   than closing the MCP session.
-- [ ] Pass request cancellation through to the search operation.
-- [ ] Add an in-process rmcp client/server test for discovery, schema bounds,
+- [x] Pass request cancellation through to the search operation.
+- [x] Add an in-process rmcp client/server test for discovery, schema bounds,
   successful calls, validation failures, backend failures, and cancellation.
-- [ ] Compare a representative MCP structured result with `search --json` to
+- [x] Compare a representative MCP structured result with `search --json` to
   catch interface drift inside this feature.
 
 **Acceptance criteria:**
 
-- [ ] MCP discovery lists `web_search` with every documented field, bound, and
+- [x] MCP discovery lists `web_search` with every documented field, bound, and
   default represented in its schema or description.
-- [ ] A successful call returns the same fields and omission behavior as CLI
+- [x] A successful call returns the same fields and omission behavior as CLI
   JSON.
-- [ ] A failed tool call leaves the MCP connection usable for the next call.
+- [x] A failed tool call leaves the MCP connection usable for the next call.
 
 **Verification:** `cargo test web_search_mcp`
 

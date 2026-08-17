@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod mcp;
 mod output;
 pub mod web;
 
@@ -8,6 +9,7 @@ use std::{io, process::ExitCode};
 use anyhow::Context;
 
 use clap::Parser;
+use rmcp::ServiceExt;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{fmt::MakeWriter, prelude::*};
@@ -262,12 +264,28 @@ fn map_fetch_error(error: FetchError) -> AppError {
 }
 
 async fn serve(config: &Config, cancellation: CancellationToken) -> Result<(), AppError> {
+    let search = SearchService::with_default_timeout(config.searxng_url.clone())
+        .map_err(|error| AppError::Runtime(error.into()))?;
+    let server = mcp::McpServer::new(search, cancellation.clone());
     tracing::debug!(
         searxng_origin = %config.searxng_url.origin().ascii_serialization(),
-        "waiting for stdio MCP transport"
+        "starting stdio MCP server"
     );
-    cancellation.cancelled().await;
-    Ok(())
+    let service = match server
+        .serve_with_ct(rmcp::transport::stdio(), cancellation)
+        .await
+    {
+        Ok(service) => service,
+        Err(rmcp::service::ServerInitializeError::Cancelled)
+        | Err(rmcp::service::ServerInitializeError::ConnectionClosed(_)) => return Ok(()),
+        Err(error) => return Err(AppError::Runtime(error.into())),
+    };
+    service
+        .waiting()
+        .await
+        .context("stdio MCP server stopped unexpectedly")
+        .map(|_| ())
+        .map_err(AppError::Runtime)
 }
 
 #[cfg(test)]

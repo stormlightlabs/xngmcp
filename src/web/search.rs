@@ -1,6 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use reqwest::{Client, StatusCode};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio_util::sync::CancellationToken;
 use url::{Host, Url};
@@ -17,26 +18,45 @@ const MAX_LIST_VALUES: usize = 10;
 const MAX_DOMAINS: usize = 20;
 
 /// Input accepted by the normalized web-search service.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 pub struct SearchRequest {
+    /// Search terms. Must not be blank; SearXNG search syntax is supported.
+    #[schemars(length(min = 1, max = 1_000))]
     pub query: String,
+    /// Maximum results to return. Defaults to 8.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 1, max = 20))]
     pub limit: Option<u8>,
+    /// Search-results page. Defaults to 1.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 1, max = 10))]
     pub page: Option<u8>,
+    /// Nonblank SearXNG language code, or `all`. Defaults to `all`.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(length(min = 1))]
     pub language: Option<String>,
+    /// Limit results to `day`, `month`, or `year`. Omit for all time.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_range: Option<TimeRange>,
+    /// Nonblank search categories. Defaults to `["general"]`; at most 10 values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(max = 10), inner(length(min = 1)))]
     pub categories: Vec<String>,
+    /// Nonblank search engines. Omit to use SearXNG's configured engines; at most 10 values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(max = 10), inner(length(min = 1)))]
     pub engines: Vec<String>,
+    /// Safe-search level: 0, 1, or 2. Defaults to 1.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(max = 2))]
     pub safe_search: Option<u8>,
+    /// Restrict results to normalized hostnames or their subdomains; at most 20 values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(max = 20), inner(length(min = 1)))]
     pub include_domains: Vec<String>,
+    /// Exclude normalized hostnames and their subdomains; at most 20 values.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schemars(length(max = 20), inner(length(min = 1)))]
     pub exclude_domains: Vec<String>,
 }
 
@@ -109,7 +129,7 @@ impl SearchRequest {
 }
 
 /// SearXNG's supported recency filters.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TimeRange {
     Day,

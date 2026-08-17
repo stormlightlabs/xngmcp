@@ -8,8 +8,8 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::web::{
-    fetch::{FetchRequest, FetchService},
-    search::{SearchRequest, SearchService},
+    fetch::{FetchRequest, FetchResponse, FetchService},
+    search::{SearchRequest, SearchResponse, SearchService},
 };
 
 /// MCP server exposing xngmcp's public web tools.
@@ -69,8 +69,7 @@ impl McpServer {
 
         match result {
             Ok(response) => {
-                let result_count = response.results.len();
-                let query = response.query.clone();
+                let text_content = search_text_fallback(&response);
                 let structured_content = match serde_json::to_value(response) {
                     Ok(content) => content,
                     Err(error) => {
@@ -80,9 +79,7 @@ impl McpServer {
                     }
                 };
                 let mut result = CallToolResult::structured(structured_content);
-                result.content = vec![ContentBlock::text(format!(
-                    "Found {result_count} result(s) for {query}."
-                ))];
+                result.content = vec![ContentBlock::text(text_content)];
                 result
             }
             Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
@@ -104,8 +101,7 @@ impl McpServer {
 
         match result {
             Ok(response) => {
-                let final_url = response.url.clone();
-                let truncated = response.truncated;
+                let text_content = fetch_text_fallback(&response);
                 let structured_content = match serde_json::to_value(response) {
                     Ok(content) => content,
                     Err(error) => {
@@ -115,19 +111,53 @@ impl McpServer {
                     }
                 };
                 let mut result = CallToolResult::structured(structured_content);
-                result.content = vec![ContentBlock::text(format!(
-                    "Fetched {final_url}{}.",
-                    if truncated {
-                        " (content truncated)"
-                    } else {
-                        ""
-                    }
-                ))];
+                result.content = vec![ContentBlock::text(text_content)];
                 result
             }
             Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
         }
     }
+}
+
+fn search_text_fallback(response: &SearchResponse) -> String {
+    if response.results.is_empty() {
+        return format!("No results for {}.", response.query);
+    }
+
+    let results = response
+        .results
+        .iter()
+        .enumerate()
+        .map(|(index, result)| {
+            format!(
+                "{}. {}\n{}\n{}",
+                index + 1,
+                result.title,
+                result.url,
+                result.snippet
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    format!("Search results for {}:\n\n{results}", response.query)
+}
+
+fn fetch_text_fallback(response: &FetchResponse) -> String {
+    let title = response
+        .title
+        .as_deref()
+        .map(|title| format!("# {title}\n\n"))
+        .unwrap_or_default();
+    let truncated = if response.truncated {
+        "\n\n[Content truncated.]"
+    } else {
+        ""
+    };
+
+    format!(
+        "Source: {}\nContent type: {}\n\n{title}{}{truncated}",
+        response.url, response.content_type, response.content
+    )
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -257,6 +287,11 @@ mod tests {
         let structured = result
             .structured_content
             .expect("successful tool result includes structured content");
+        assert!(
+            result.content[0]
+                .as_text()
+                .is_some_and(|text| text.text.contains("https://example.com/article"))
+        );
         let expected = SearchService::with_default_timeout(url.parse()?)?;
         let expected = expected
             .search(SearchRequest::new("rust"), CancellationToken::new())
@@ -338,7 +373,7 @@ mod tests {
         assert!(
             result.content[0]
                 .as_text()
-                .is_some_and(|text| text.text.contains("Fetched"))
+                .is_some_and(|text| text.text.contains("Readable article content."))
         );
         let expected = expected_fetch
             .fetch(

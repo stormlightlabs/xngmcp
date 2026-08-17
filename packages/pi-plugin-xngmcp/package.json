@@ -1,0 +1,39 @@
+{
+  "name": "pi-plugin-xngmcp",
+  "version": "0.1.0",
+  "description": "Pi guidance for xngmcp web search and fetch tools",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "mcp",
+    "web-search"
+  ],
+  "files": [
+    "extensions",
+    "skills",
+    "examples",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.84.2",
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

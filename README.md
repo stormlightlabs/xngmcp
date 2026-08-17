@@ -29,6 +29,11 @@ To make the server available to an MCP client, install the built source package:
 cargo install --path .
 ```
 
+## Pi
+
+Install and configure the Pi package through its
+[setup guide](packages/pi-plugin-xngmcp/README.md).
+
 ## Usage
 
 ```sh

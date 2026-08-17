@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "web": {
+      "command": "xngmcp",
+      "args": ["serve"],
+      "env": {
+        "SEARXNG_URL": "http://127.0.0.1:8080"
+      },
+      "directTools": ["web_search", "web_fetch"],
+      "toolPrefix": "none"
+    }
+  }
+}

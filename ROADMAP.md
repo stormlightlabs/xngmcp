@@ -421,16 +421,18 @@ leaving other MCP servers on the adapter's lazy proxy:
             "env": {
                 "SEARXNG_URL": "http://127.0.0.1:8080"
             },
-            "directTools": ["web_search", "web_fetch"]
+            "directTools": ["web_search", "web_fetch"],
+            "toolPrefix": "none"
         }
     }
 }
 ```
 
 Use the adapter's `/mcp` panel and reconnect command for setup and diagnostics
-instead of adding a second xngmcp-specific connection UI. Document checks for
-the package, binary `PATH`, server connection, direct-tool cache, and SearXNG
-health. The first session may expose only the lazy proxy until
+instead of adding a second xngmcp-specific connection UI. Set `toolPrefix` to
+`none` for this server so the direct tools retain their MCP names. Document
+checks for the package, binary `PATH`, server connection, direct-tool cache,
+and SearXNG health. The first session may expose only the lazy proxy until
 `/mcp reconnect web` populates the adapter's tool cache and reloads Pi.
 
 Acceptance:

@@ -331,36 +331,36 @@ Pi's visible web capability on machines where Pi has no native web search.
 
 **Work:**
 
-- [ ] Add `packages/pi-plugin-xngmcp` as a Pi package with a package manifest,
+- [x] Add `packages/pi-plugin-xngmcp` as a Pi package with a package manifest,
   an xngmcp skill, and a small extension that adds prompt guidance without
   registering replacement tools. The guidance tells Pi when current or
   external information requires web search, how to form focused queries, and
   when to fetch a chosen result.
-- [ ] Integrate through `pi-mcp-adapter`; do not add a TypeScript search client,
+- [x] Integrate through `pi-mcp-adapter`; do not add a TypeScript search client,
   fetch client, or second MCP transport implementation.
-- [ ] Document the adapter, binary `PATH`, healthy SearXNG endpoint, package
+- [x] Document the adapter, binary `PATH`, healthy SearXNG endpoint, package
   installation, and project `.mcp.json` entry. Configure `directTools` for only
   `web_search` and `web_fetch` so both appear beside Pi's built-in tools.
-- [ ] Verify first-run behavior with an empty adapter metadata cache, then use
+- [x] Verify first-run behavior with an empty adapter metadata cache, then use
   `/mcp reconnect web` and Pi's normal reload flow to expose both direct tools.
-- [ ] Ask Pi for current information without mentioning MCP or xngmcp. Confirm
+- [x] Ask Pi for current information without mentioning MCP or xngmcp. Confirm
   it searches, chooses a returned public URL, and fetches it with a bounded
   character limit.
-- [ ] Use the adapter's `/mcp` panel for connection and tool diagnostics.
+- [x] Use the adapter's `/mcp` panel for connection and tool diagnostics.
   Document the shortest checks for a missing package, missing binary, stale
   tool cache, launch failure, and unreachable SearXNG endpoint.
 
 **Acceptance criteria:**
 
-- [ ] A fresh Pi installation can install the package and copy the example
+- [x] A fresh Pi installation can install the package and copy the example
   without machine-specific paths.
-- [ ] Pi lists `web_search` and `web_fetch` as direct tools after initial cache
+- [x] Pi lists `web_search` and `web_fetch` as direct tools after initial cache
   discovery and reload.
-- [ ] Pi selects search then fetch for a current-information request without the
+- [x] Pi selects search then fetch for a current-information request without the
   user naming MCP, xngmcp, or either tool.
-- [ ] The Pi package contains no search, fetch, MCP transport, or SearXNG client
+- [x] The Pi package contains no search, fetch, MCP transport, or SearXNG client
   implementation.
-- [ ] Stopping SearXNG produces a visible tool error while Pi remains usable.
+- [x] Stopping SearXNG produces a visible tool error while Pi remains usable.
 
 **Verification:** Install the local Pi package in a clean Pi agent directory,
 run the documented empty-cache discovery and reconnect checks, then run the

@@ -12,60 +12,59 @@ and generated reference material needed by the CLI and stdio server.
 
 **Work:**
 
-- [ ] Create one Cargo package with `Cargo.toml`, a committed `Cargo.lock`, a
+- [x] Create one Cargo package with `Cargo.toml`, a committed `Cargo.lock`, a
   documented `rust-version`, one library target, one binary target, no workspace
   members, and no local path dependencies.
-- [ ] Add `src/lib.rs` with public `async fn run() -> ExitCode`. It owns argument
+- [x] Add `src/lib.rs` with public `async fn run() -> ExitCode`. It owns argument
   parsing, configuration, tracing initialization, cancellation wiring, command
   dispatch, and the mapping from expected failures to process exit status.
-- [ ] Keep `src/main.rs` to the Tokio entry point that returns
+- [x] Keep `src/main.rs` to the Tokio entry point that returns
   `xngmcp::run().await`; do not duplicate parsing, logging, or error handling in
   the binary target.
-- [ ] Add released versions of Clap, `owo-colors`, `tracing`,
+- [x] Add released versions of Clap, `owo-colors`, `tracing`,
   `tracing-subscriber`, Tokio, `tokio-util`, `serde`, and `serde_json`; add every
   other dependency in the ticket that first uses it.
-- [ ] Define the root parser and `serve` subcommand in a side-effect-free
+- [x] Define the root parser and `serve` subcommand in a side-effect-free
   `src/cli.rs` with Clap's derive API, and expose the build version through
   `xngmcp --version`. Keep parser types independent of application service
   modules so the build script can compile the same command definition.
-- [ ] Add `build.rs` and build dependencies on Clap, `clap_mangen`, and
+- [x] Add `build.rs` and build dependencies on Clap, `clap_mangen`, and
   `clap_complete`. Reuse `src/cli.rs` through a path module and Clap's
   `CommandFactory`; do not maintain a second command tree.
-- [ ] Use `clap_mangen::generate_to` to generate the root and subcommand man
+- [x] Use `clap_mangen::generate_to` to generate the root and subcommand man
   pages, and generate static completions for Bash, Zsh, Fish, Elvish, and
-  PowerShell into a dedicated directory under `OUT_DIR`. Emit rerun directives
-  for `src/cli.rs` and `Cargo.toml`, and expose that directory to tests through
-  `cargo:rustc-env`.
-- [ ] Make generation deterministic and idempotent when `OUT_DIR` already
-  contains files. Fail the build with a useful error if any requested artifact
-  cannot be rendered or written; do not write generated files into the source
-  tree.
-- [ ] Load settings in flag, environment, then default order. Support
+  PowerShell into `assets/man` and `assets/completions`. Ignore both generated
+  directories in Git, emit rerun directives for `src/cli.rs` and `Cargo.toml`,
+  and expose the assets directory to tests through `cargo:rustc-env`.
+- [x] Make generation deterministic and idempotent when the generated asset
+  directories already contain files. Fail the build with a useful error if any
+  requested artifact cannot be rendered or written.
+- [x] Load settings in flag, environment, then default order. Support
   `--searxng-url`, `--log-level`, and `--no-color` with their documented
   environment variables.
-- [ ] Install one `tracing-subscriber` at process startup, filter it from the
+- [x] Install one `tracing-subscriber` at process startup, filter it from the
   resolved log level, and write its formatted diagnostics only to stderr.
-- [ ] Create one Tokio cancellation token driven by SIGINT and SIGTERM and pass
+- [x] Create one Tokio cancellation token driven by SIGINT and SIGTERM and pass
   clones into command, HTTP, and MCP paths.
-- [ ] Reserve stdout for command results or MCP frames. Keep status, diagnostics,
+- [x] Reserve stdout for command results or MCP frames. Keep status, diagnostics,
   and errors on stderr.
-- [ ] Configure Clap to return concise usage errors for missing, extra, or
+- [x] Configure Clap to return concise usage errors for missing, extra, or
   unknown arguments without accepting abbreviated subcommands.
 
 **Acceptance criteria:**
 
-- [ ] `xngmcp --help`, `xngmcp --version`, and `xngmcp serve --help` work.
-- [ ] `src/main.rs` delegates to `xngmcp::run()` and contains no application
+- [x] `xngmcp --help`, `xngmcp --version`, and `xngmcp serve --help` work.
+- [x] `src/main.rs` delegates to `xngmcp::run()` and contains no application
   behavior beyond the async entry point.
-- [ ] A clean build produces a non-empty `xngmcp.1`, one page for every current
+- [x] A clean build produces a non-empty `xngmcp.1`, one page for every current
   subcommand, and a completion file for each supported shell; the generated
   artifacts contain the current commands and global options.
-- [ ] Changing a command or option in `src/cli.rs` updates runtime help, the man
+- [x] Changing a command or option in `src/cli.rs` updates runtime help, the man
   page, and completions without editing another command definition.
-- [ ] Flags override environment values, and invalid URLs or log levels fail
+- [x] Flags override environment values, and invalid URLs or log levels fail
   before a command starts work.
-- [ ] Help and version output do not require SearXNG to be running.
-- [ ] Unit or integration tests cover configuration precedence, Clap exit
+- [x] Help and version output do not require SearXNG to be running.
+- [x] Unit or integration tests cover configuration precedence, Clap exit
   behavior, stream selection, tracing output, cancellation propagation, and the
   presence and content of generated CLI artifacts.
 
@@ -389,9 +388,9 @@ and troubleshoot from the repository documentation.
 - [ ] Check every copied command and configuration example from a clean shell.
 - [ ] Confirm command help, README examples, MCP schemas, and infra defaults use
   the same names and limits.
-- [ ] Document where packagers find the build-generated man page and completion
-  files under Cargo's `OUT_DIR`, and include them in the release packaging
-  smoke check.
+- [ ] Document where packagers find the build-generated man pages under
+  `assets/man` and completion files under `assets/completions`, and include them
+  in the release packaging smoke check.
 - [ ] Run formatting, check, Clippy with warnings denied, tests, Compose
   validation, and the roadmap's Pi and thndrs acceptance flows.
 - [ ] Record the minimum supported Rust version, resolved crate versions from

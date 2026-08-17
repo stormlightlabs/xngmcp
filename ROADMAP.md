@@ -229,8 +229,8 @@ at the default level.
 
 `src/main.rs` delegates to `xngmcp::run()` in `src/lib.rs`. The feature flow
 below begins after that library entry point. Separately, `build.rs` consumes the
-shared Clap definition and writes man-page and completion artifacts to
-`OUT_DIR`.
+shared Clap definition and writes ignored man-page and completion artifacts to
+`assets/man` and `assets/completions`.
 
 ```text
 src/cli.rs (Clap) ──────────────────┐
@@ -266,6 +266,9 @@ src/
     fetch.rs
     search.rs
 tests/
+assets/
+  man/                 # build-generated, ignored
+  completions/         # build-generated, ignored
 infra/searxng/
   .env.example
   bootstrap.sh
@@ -287,10 +290,10 @@ on service modules or perform I/O. `src/lib.rs` maps parsed commands to feature
 services. `build.rs` reuses the same parser module with a path module and Clap's
 `CommandFactory`, then uses `clap_mangen::generate_to` and `clap_complete` to
 write the root and subcommand man pages plus Bash, Zsh, Fish, Elvish, and
-PowerShell completions under `OUT_DIR`. It declares `src/cli.rs` and
-`Cargo.toml` as rerun inputs and exposes the generated directory to tests with a
-Cargo compile-time environment value. Generated files never modify the source
-tree.
+PowerShell completions under `assets/man` and `assets/completions`. It declares
+`src/cli.rs` and `Cargo.toml` as rerun inputs and exposes the assets directory
+to tests with a Cargo compile-time environment value. Both generated directories
+are ignored by Git.
 
 Core request and result types live with their feature modules under `src/web`.
 Traits are introduced only at network boundaries where tests need substitution;

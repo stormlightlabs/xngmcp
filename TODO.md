@@ -80,23 +80,23 @@ and generated reference material needed by the CLI and stdio server.
 
 **Work:**
 
-- [ ] Add `compose.yaml` with immutable image versions, loopback-only SearXNG
+- [x] Add `compose.yaml` with immutable image versions, loopback-only SearXNG
   binding, health checks, restart policy, and a disposable Valkey cache volume.
-- [ ] Add `settings.yml` with JSON search enabled, safe search level 1, bounded
+- [x] Add `settings.yml` with JSON search enabled, safe search level 1, bounded
   outgoing timeouts, Valkey caching, and private-instance settings.
-- [ ] Add `.env.example` and a portable `bootstrap.sh` that creates a mode-0600
+- [x] Add `.env.example` and a portable `bootstrap.sh` that creates a mode-0600
   `.env` with a fresh secret and never overwrites an existing file.
-- [ ] Add repeatable smoke checks for `/healthz` and a JSON `/search` response.
-- [ ] Document start, stop, logs, health, image upgrades, configuration changes,
+- [x] Add repeatable smoke checks for `/healthz` and a JSON `/search` response.
+- [x] Document start, stop, logs, health, image upgrades, configuration changes,
   and rollback in `infra/searxng/README.md`.
 
 **Acceptance criteria:**
 
-- [ ] `docker compose config` succeeds without printing the generated secret.
-- [ ] A clean start and restart make both containers healthy.
-- [ ] The host port is configurable and bound to `127.0.0.1` by default.
-- [ ] Re-running bootstrap preserves the current secret and configuration.
-- [ ] A JSON search returns results suitable for adapter and CLI development.
+- [x] `docker compose config` succeeds without printing the generated secret.
+- [x] A clean start and restart make both containers healthy.
+- [x] The host port is configurable and bound to `127.0.0.1` by default.
+- [x] Re-running bootstrap preserves the current secret and configuration.
+- [x] A JSON search returns results suitable for adapter and CLI development.
 
 **Verification:** Run Compose config, clean-start, restart, health, and JSON
 search checks from the infra README.

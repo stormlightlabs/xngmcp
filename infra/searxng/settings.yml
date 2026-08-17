@@ -1,0 +1,27 @@
+use_default_settings: true
+
+general:
+  instance_name: 'xngmcp private search'
+  enable_metrics: false
+
+search:
+  safe_search: 1
+  autocomplete: ''
+  favicon_resolver: ''
+  formats:
+    - html
+    - json
+
+server:
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  secret_key: 'overridden-by-SEARXNG_SECRET'
+
+valkey:
+  url: valkey://valkey:6379/0
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 10.0
+

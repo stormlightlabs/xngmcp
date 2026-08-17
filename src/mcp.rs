@@ -4,25 +4,51 @@ use rmcp::{
     model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerInfo},
     tool, tool_handler, tool_router,
 };
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::web::search::{SearchRequest, SearchService};
+use crate::web::{
+    fetch::{FetchRequest, FetchService},
+    search::{SearchRequest, SearchService},
+};
 
-/// MCP server exposing xngmcp's web-search capability.
+/// MCP server exposing xngmcp's public web tools.
 #[derive(Debug, Clone)]
 pub(crate) struct McpServer {
     search: SearchService,
+    fetch: FetchService,
     cancellation: CancellationToken,
     tool_router: ToolRouter<Self>,
 }
 
 impl McpServer {
-    pub(crate) fn new(search: SearchService, cancellation: CancellationToken) -> Self {
+    pub(crate) fn new(
+        search: SearchService,
+        fetch: FetchService,
+        cancellation: CancellationToken,
+    ) -> Self {
         Self {
             search,
+            fetch,
             cancellation,
             tool_router: Self::tool_router(),
         }
+    }
+
+    fn request_cancellation(
+        &self,
+        request_cancellation: CancellationToken,
+    ) -> (CancellationToken, JoinHandle<()>) {
+        let cancellation = CancellationToken::new();
+        let cancellation_to_trigger = cancellation.clone();
+        let root_cancellation = self.cancellation.clone();
+        let watcher = tokio::spawn(async move {
+            tokio::select! {
+                _ = request_cancellation.cancelled() => cancellation_to_trigger.cancel(),
+                _ = root_cancellation.cancelled() => cancellation_to_trigger.cancel(),
+            }
+        });
+        (cancellation, watcher)
     }
 }
 
@@ -37,16 +63,7 @@ impl McpServer {
         Parameters(request): Parameters<SearchRequest>,
         request_cancellation: CancellationToken,
     ) -> CallToolResult {
-        let cancellation = CancellationToken::new();
-        let cancellation_to_trigger = cancellation.clone();
-        let root_cancellation = self.cancellation.clone();
-        let watcher = tokio::spawn(async move {
-            tokio::select! {
-                _ = request_cancellation.cancelled() => cancellation_to_trigger.cancel(),
-                _ = root_cancellation.cancelled() => cancellation_to_trigger.cancel(),
-            }
-        });
-
+        let (cancellation, watcher) = self.request_cancellation(request_cancellation);
         let result = self.search.search(request, cancellation).await;
         watcher.abort();
 
@@ -71,6 +88,46 @@ impl McpServer {
             Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
         }
     }
+
+    #[tool(
+        name = "web_fetch",
+        description = "Fetch bounded, readable Markdown or text from a public HTTP(S) URL. Use a returned search URL when possible. Local networks, unsupported media, and pages without a readable article are rejected."
+    )]
+    async fn web_fetch(
+        &self,
+        Parameters(request): Parameters<FetchRequest>,
+        request_cancellation: CancellationToken,
+    ) -> CallToolResult {
+        let (cancellation, watcher) = self.request_cancellation(request_cancellation);
+        let result = self.fetch.fetch(request, cancellation).await;
+        watcher.abort();
+
+        match result {
+            Ok(response) => {
+                let final_url = response.url.clone();
+                let truncated = response.truncated;
+                let structured_content = match serde_json::to_value(response) {
+                    Ok(content) => content,
+                    Err(error) => {
+                        return CallToolResult::error(vec![ContentBlock::text(format!(
+                            "could not serialize fetch result: {error}"
+                        ))]);
+                    }
+                };
+                let mut result = CallToolResult::structured(structured_content);
+                result.content = vec![ContentBlock::text(format!(
+                    "Fetched {final_url}{}.",
+                    if truncated {
+                        " (content truncated)"
+                    } else {
+                        ""
+                    }
+                ))];
+                result
+            }
+            Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_string())]),
+        }
+    }
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -85,12 +142,17 @@ impl ServerHandler for McpServer {
 mod tests {
     use std::{
         io::{Read, Write},
-        net::TcpListener,
-        sync::mpsc,
+        net::{SocketAddr, TcpListener},
+        sync::{Arc, mpsc},
         thread,
         time::Duration,
     };
 
+    use reqwest::{
+        Client,
+        dns::{Addrs, Name, Resolve, Resolving},
+        redirect::Policy,
+    };
     use rmcp::{
         ClientHandler, ServiceExt,
         model::{CallToolRequestParams, ClientInfo},
@@ -98,7 +160,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::output;
+    use crate::{output, web::fetch::FetchFormat};
 
     #[derive(Debug, Default)]
     struct TestClient;
@@ -126,6 +188,7 @@ mod tests {
         let (server_transport, client_transport) = tokio::io::duplex(8_192);
         let server = McpServer::new(
             SearchService::with_default_timeout(url.parse()?)?,
+            FetchService::with_default_timeout()?,
             CancellationToken::new(),
         );
         let server_task = tokio::spawn(async move {
@@ -135,9 +198,12 @@ mod tests {
         let client = TestClient.serve(client_transport).await?;
 
         let tools = client.list_tools(Default::default()).await?;
-        assert_eq!(tools.tools.len(), 1);
-        let tool = &tools.tools[0];
-        assert_eq!(tool.name, "web_search");
+        assert_eq!(tools.tools.len(), 2);
+        let tool = tools
+            .tools
+            .iter()
+            .find(|tool| tool.name == "web_search")
+            .expect("web_search is discovered");
         let properties = tool.input_schema["properties"]
             .as_object()
             .expect("tool schema has properties");
@@ -209,10 +275,131 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn web_fetch_mcp_uses_shared_schema_and_response() -> anyhow::Result<()> {
+        let (url, fetch, backend) = fetch_fixture(vec![
+            plain_text_response("Readable article content."),
+            plain_text_response("Readable article content."),
+        ]);
+        let expected_fetch = fetch.clone();
+        let (server_transport, client_transport) = tokio::io::duplex(8_192);
+        let server = McpServer::new(
+            SearchService::with_default_timeout("http://127.0.0.1:8080".parse()?)?,
+            fetch,
+            CancellationToken::new(),
+        );
+        let server_task = tokio::spawn(async move {
+            server.serve(server_transport).await?.waiting().await?;
+            anyhow::Ok(())
+        });
+        let client = TestClient.serve(client_transport).await?;
+
+        let tools = client.list_tools(Default::default()).await?;
+        let mut tool_names = tools
+            .tools
+            .iter()
+            .map(|tool| tool.name.to_string())
+            .collect::<Vec<_>>();
+        tool_names.sort();
+        assert_eq!(tool_names, ["web_fetch", "web_search"]);
+        let tool = tools
+            .tools
+            .iter()
+            .find(|tool| tool.name == "web_fetch")
+            .expect("web_fetch is discovered");
+        let properties = tool.input_schema["properties"]
+            .as_object()
+            .expect("tool schema has properties");
+        assert_eq!(properties["max_chars"]["minimum"], 1_000);
+        assert_eq!(properties["max_chars"]["maximum"], 100_000);
+        assert!(
+            properties["format"]["description"]
+                .as_str()
+                .is_some_and(|description| description.contains("Defaults to `markdown`"))
+        );
+        assert!(
+            tool.input_schema["required"]
+                .as_array()
+                .is_some_and(|fields| fields.contains(&json!("url")))
+        );
+
+        let validation_failure = client
+            .call_tool(fetch_tool_call(json!({ "url": "file:///tmp/article" })))
+            .await?;
+        assert_eq!(validation_failure.is_error, Some(true));
+        assert!(
+            validation_failure.content[0]
+                .as_text()
+                .is_some_and(|text| text.text.contains("absolute HTTP or HTTPS"))
+        );
+
+        let arguments = json!({ "url": url, "max_chars": 1_000, "format": "text" });
+        let result = client.call_tool(fetch_tool_call(arguments.clone())).await?;
+        assert_eq!(result.is_error, Some(false));
+        assert!(
+            result.content[0]
+                .as_text()
+                .is_some_and(|text| text.text.contains("Fetched"))
+        );
+        let expected = expected_fetch
+            .fetch(
+                FetchRequest {
+                    url: arguments["url"].as_str().expect("URL argument").into(),
+                    max_chars: Some(1_000),
+                    format: Some(FetchFormat::Text),
+                },
+                CancellationToken::new(),
+            )
+            .await?;
+        let mut cli_json = Vec::new();
+        output::write_json(&mut cli_json, &expected)?;
+        assert_eq!(
+            result.structured_content,
+            Some(serde_json::from_slice::<serde_json::Value>(&cli_json)?)
+        );
+
+        client.cancel().await?;
+        server_task.await??;
+        backend.join().expect("fixture completes");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn web_fetch_mcp_passes_request_cancellation_to_fetch() -> anyhow::Result<()> {
+        let (url, fetch, request_started, release, backend) = hanging_fetch_fixture();
+        let server = McpServer::new(
+            SearchService::with_default_timeout("http://127.0.0.1:8080".parse()?)?,
+            fetch,
+            CancellationToken::new(),
+        );
+        let request_cancellation = CancellationToken::new();
+        let call_cancellation = request_cancellation.clone();
+        let call = tokio::spawn(async move {
+            server
+                .web_fetch(Parameters(FetchRequest::new(url)), call_cancellation)
+                .await
+        });
+
+        request_started.await?;
+        request_cancellation.cancel();
+        let result = call.await?;
+        release.send(()).expect("release fixture");
+        backend.join().expect("fixture completes");
+
+        assert_eq!(result.is_error, Some(true));
+        assert!(
+            result.content[0]
+                .as_text()
+                .is_some_and(|text| text.text.contains("fetch was cancelled"))
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn web_search_mcp_passes_request_cancellation_to_search() -> anyhow::Result<()> {
         let (url, request_started, release, backend) = hanging_fixture();
         let server = McpServer::new(
             SearchService::with_default_timeout(url.parse()?)?,
+            FetchService::with_default_timeout()?,
             CancellationToken::new(),
         );
         let request_cancellation = CancellationToken::new();
@@ -245,6 +432,93 @@ mod tests {
                 .expect("tool arguments are an object")
                 .clone(),
         )
+    }
+
+    fn fetch_tool_call(arguments: serde_json::Value) -> CallToolRequestParams {
+        CallToolRequestParams::new("web_fetch").with_arguments(
+            arguments
+                .as_object()
+                .expect("tool arguments are an object")
+                .clone(),
+        )
+    }
+
+    fn fetch_fixture(responses: Vec<String>) -> (String, FetchService, thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind fixture");
+        let address = listener.local_addr().expect("fixture address");
+        let server = thread::spawn(move || {
+            for response in responses {
+                let (mut stream, _) = listener.accept().expect("accept request");
+                read_request(&mut stream);
+                stream
+                    .write_all(response.as_bytes())
+                    .expect("write response");
+            }
+        });
+        let client = Client::builder()
+            .redirect(Policy::none())
+            .dns_resolver(Arc::new(FixtureResolver { address }))
+            .build()
+            .expect("build fixture client");
+        let service = FetchService::with_test_client(client, Duration::from_secs(1));
+        (
+            format!("http://public.example:{}/article", address.port()),
+            service,
+            server,
+        )
+    }
+
+    fn hanging_fetch_fixture() -> (
+        String,
+        FetchService,
+        tokio::sync::oneshot::Receiver<()>,
+        mpsc::Sender<()>,
+        thread::JoinHandle<()>,
+    ) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind fixture");
+        let address = listener.local_addr().expect("fixture address");
+        let (started_sender, started_receiver) = tokio::sync::oneshot::channel();
+        let (release_sender, release_receiver) = mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept request");
+            read_request(&mut stream);
+            started_sender.send(()).expect("signal request");
+            release_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("wait for test cleanup");
+        });
+        let client = Client::builder()
+            .redirect(Policy::none())
+            .dns_resolver(Arc::new(FixtureResolver { address }))
+            .build()
+            .expect("build fixture client");
+        let service = FetchService::with_test_client(client, Duration::from_secs(1));
+        (
+            format!("http://public.example:{}/article", address.port()),
+            service,
+            started_receiver,
+            release_sender,
+            server,
+        )
+    }
+
+    fn plain_text_response(body: &str) -> String {
+        format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: text/plain; charset=utf-8\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    #[derive(Debug)]
+    struct FixtureResolver {
+        address: SocketAddr,
+    }
+
+    impl Resolve for FixtureResolver {
+        fn resolve(&self, _name: Name) -> Resolving {
+            let address = self.address;
+            Box::pin(async move { Ok(Box::new([address].into_iter()) as Addrs) })
+        }
     }
 
     fn fixture_server(responses: Vec<(u16, &'static str)>) -> (String, thread::JoinHandle<()>) {

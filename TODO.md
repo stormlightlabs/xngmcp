@@ -269,27 +269,27 @@ under logging, errors, cancellation, and shutdown.
 
 **Work:**
 
-- [ ] Derive the rmcp input schema from the shared typed URL, `max_chars`, and
+- [x] Derive the rmcp input schema from the shared typed URL, `max_chars`, and
   format fields, and register `web_fetch` with an agent-oriented description.
-- [ ] Return the shared fetch result as structured content with a concise text
+- [x] Return the shared fetch result as structured content with a concise text
   fallback, including the final URL and truncation state.
-- [ ] Map validation, network policy, media, size, timeout, and extraction
+- [x] Map validation, network policy, media, size, timeout, and extraction
   failures to actionable tool errors.
-- [ ] Add in-process rmcp discovery and call tests for success, failure, and
+- [x] Add in-process rmcp discovery and call tests for success, failure, and
   cancellation.
-- [ ] Compare a representative MCP structured result with `fetch --json`.
-- [ ] Serve the handler with rmcp's Tokio stdio transport and add a subprocess
+- [x] Compare a representative MCP structured result with `fetch --json`.
+- [x] Serve the handler with rmcp's Tokio stdio transport and add a subprocess
   test that enables verbose tracing and proves stdout still contains only valid
   MCP protocol messages.
-- [ ] Verify that EOF on stdin and process cancellation shut down promptly.
+- [x] Verify that EOF on stdin and process cancellation shut down promptly.
 
 **Acceptance criteria:**
 
-- [ ] MCP discovery lists exactly `web_search` and `web_fetch`.
-- [ ] `web_fetch` enforces the same network and size rules as direct and CLI
+- [x] MCP discovery lists exactly `web_search` and `web_fetch`.
+- [x] `web_fetch` enforces the same network and size rules as direct and CLI
   calls.
-- [ ] Logs and styled output never enter the protocol stream.
-- [ ] Tool errors do not terminate the stdio session.
+- [x] Logs and styled output never enter the protocol stream.
+- [x] Tool errors do not terminate the stdio session.
 
 **Verification:** `cargo test mcp` and `cargo test stdio`
 

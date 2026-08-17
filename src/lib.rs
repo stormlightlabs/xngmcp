@@ -266,7 +266,9 @@ fn map_fetch_error(error: FetchError) -> AppError {
 async fn serve(config: &Config, cancellation: CancellationToken) -> Result<(), AppError> {
     let search = SearchService::with_default_timeout(config.searxng_url.clone())
         .map_err(|error| AppError::Runtime(error.into()))?;
-    let server = mcp::McpServer::new(search, cancellation.clone());
+    let fetch =
+        FetchService::with_default_timeout().map_err(|error| AppError::Runtime(error.into()))?;
+    let server = mcp::McpServer::new(search, fetch, cancellation.clone());
     tracing::debug!(
         searxng_origin = %config.searxng_url.origin().ascii_serialization(),
         "starting stdio MCP server"

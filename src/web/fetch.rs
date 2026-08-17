@@ -13,7 +13,8 @@ use reqwest::{
     header::{CONTENT_LENGTH, CONTENT_TYPE, LOCATION},
     redirect::Policy,
 };
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use tokio::{net::lookup_host, task::spawn_blocking, time::timeout};
 use tokio_util::sync::CancellationToken;
 use url::{Host, Url};
@@ -29,11 +30,16 @@ const MIN_MAX_CHARS: usize = 1_000;
 const MAX_MAX_CHARS: usize = 100_000;
 
 /// Input accepted by the public web-fetch service.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize)]
 pub struct FetchRequest {
+    /// Public absolute HTTP or HTTPS URL to fetch.
+    #[schemars(length(min = 1))]
     pub url: String,
+    /// Maximum readable characters to return. Defaults to 30,000.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(range(min = 1_000, max = 100_000))]
     pub max_chars: Option<usize>,
+    /// Readable output format. Defaults to `markdown`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<FetchFormat>,
 }
@@ -68,7 +74,7 @@ impl FetchRequest {
 }
 
 /// Readable output format for fetched HTML.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, JsonSchema, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FetchFormat {
     #[default]
@@ -211,7 +217,7 @@ impl FetchService {
     }
 
     #[cfg(test)]
-    fn with_test_client(client: Client, operation_timeout: Duration) -> Self {
+    pub(crate) fn with_test_client(client: Client, operation_timeout: Duration) -> Self {
         Self {
             client,
             operation_timeout,

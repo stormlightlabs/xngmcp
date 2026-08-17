@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod output;
 pub mod web;
 
 use std::{io, process::ExitCode};
@@ -11,7 +12,14 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{fmt::MakeWriter, prelude::*};
 
-use crate::{cli::Command, config::Config};
+use crate::{
+    cli::Command,
+    config::Config,
+    web::{
+        fetch::{FetchError, FetchFormat, FetchRequest, FetchService},
+        search::{SearchError, SearchRequest, SearchService, TimeRange},
+    },
+};
 
 #[derive(Debug, thiserror::Error)]
 enum AppError {
@@ -127,7 +135,129 @@ async fn dispatch(
     cancellation: CancellationToken,
 ) -> Result<(), AppError> {
     match command {
+        Command::Search {
+            query,
+            limit,
+            page,
+            language,
+            time_range,
+            categories,
+            engines,
+            safe_search,
+            include_domains,
+            exclude_domains,
+            json,
+            plain,
+        } => {
+            let request = SearchRequest {
+                query: query.clone(),
+                limit: *limit,
+                page: *page,
+                language: language.clone(),
+                time_range: time_range.as_deref().map(|value| match value {
+                    "day" => TimeRange::Day,
+                    "month" => TimeRange::Month,
+                    "year" => TimeRange::Year,
+                    _ => unreachable!("Clap validates time ranges"),
+                }),
+                categories: categories.clone(),
+                engines: engines.clone(),
+                safe_search: *safe_search,
+                include_domains: include_domains.clone(),
+                exclude_domains: exclude_domains.clone(),
+            };
+            search(config, request, *json, *plain, cancellation).await
+        }
+        Command::Fetch {
+            url,
+            max_chars,
+            format,
+            json,
+        } => {
+            let request = FetchRequest {
+                url: url.clone(),
+                max_chars: *max_chars,
+                format: format.as_deref().map(|value| match value {
+                    "markdown" => FetchFormat::Markdown,
+                    "text" => FetchFormat::Text,
+                    _ => unreachable!("Clap validates fetch formats"),
+                }),
+            };
+            fetch(config, request, *json, cancellation).await
+        }
         Command::Serve => serve(config, cancellation).await,
+    }
+}
+
+async fn search(
+    config: &Config,
+    request: SearchRequest,
+    json: bool,
+    plain: bool,
+    cancellation: CancellationToken,
+) -> Result<(), AppError> {
+    let service = SearchService::with_default_timeout(config.searxng_url.clone())
+        .map_err(|error| AppError::Runtime(error.into()))?;
+    let status = output::StatusLine::start(output::status_enabled(), "Searching…");
+    let response = service.search(request, cancellation).await;
+    drop(status);
+    let response = response.map_err(map_search_error)?;
+
+    let mut stdout = io::stdout().lock();
+    if json {
+        output::write_json(&mut stdout, &response).context("could not write search result")?;
+    } else if plain {
+        output::write_plain_search(&mut stdout, &response)
+            .context("could not write search result")?;
+    } else {
+        output::write_human_search(
+            &mut stdout,
+            &response,
+            output::color_enabled(config.no_color),
+        )
+        .context("could not write search result")?;
+    }
+    Ok(())
+}
+
+async fn fetch(
+    config: &Config,
+    request: FetchRequest,
+    json: bool,
+    cancellation: CancellationToken,
+) -> Result<(), AppError> {
+    let service =
+        FetchService::with_default_timeout().map_err(|error| AppError::Runtime(error.into()))?;
+    let status = output::StatusLine::start(output::status_enabled(), "Fetching…");
+    let response = service.fetch(request, cancellation).await;
+    drop(status);
+    let response = response.map_err(map_fetch_error)?;
+
+    let mut stdout = io::stdout().lock();
+    if json {
+        output::write_json(&mut stdout, &response).context("could not write fetched content")?;
+    } else {
+        output::write_human_fetch(
+            &mut stdout,
+            &response,
+            output::color_enabled(config.no_color),
+        )
+        .context("could not write fetched content")?;
+    }
+    Ok(())
+}
+
+fn map_search_error(error: SearchError) -> AppError {
+    match error {
+        SearchError::Validation(message) => AppError::usage(message),
+        error => AppError::Runtime(error.into()),
+    }
+}
+
+fn map_fetch_error(error: FetchError) -> AppError {
+    match error {
+        FetchError::Validation(message) => AppError::usage(message),
+        error => AppError::Runtime(error.into()),
     }
 }
 
@@ -226,10 +356,17 @@ mod tests {
             fs::read_to_string(man_directory.join("xngmcp.1")).expect("root man page is generated");
         let serve_man_page = fs::read_to_string(man_directory.join("xngmcp-serve.1"))
             .expect("serve man page is generated");
+        let search_man_page = fs::read_to_string(man_directory.join("xngmcp-search.1"))
+            .expect("search man page is generated");
+        let fetch_man_page = fs::read_to_string(man_directory.join("xngmcp-fetch.1"))
+            .expect("fetch man page is generated");
 
         assert!(root_man_page.contains("searxng\\-url"));
-        assert!(root_man_page.contains("serve"));
+        assert!(root_man_page.contains("search"));
+        assert!(root_man_page.contains("fetch"));
         assert!(serve_man_page.contains("Run the stdio MCP server"));
+        assert!(search_man_page.contains("include\\-domain"));
+        assert!(fetch_man_page.contains("max\\-chars"));
 
         for completion in [
             "xngmcp.bash",
@@ -241,6 +378,8 @@ mod tests {
             let contents = fs::read_to_string(completions_directory.join(completion))
                 .unwrap_or_else(|_| panic!("{completion} completion is generated"));
             assert!(contents.contains("serve"));
+            assert!(contents.contains("search"));
+            assert!(contents.contains("fetch"));
             assert!(contents.contains("searxng-url"));
         }
     }

@@ -197,31 +197,31 @@ both web features, following the command-line interface in the roadmap.
 
 **Work:**
 
-- [ ] Add `search <query>` and `fetch <url>` as Clap subcommands with exact
+- [x] Add `search <query>` and `fetch <url>` as Clap subcommands with exact
   positional argument counts, value parsers, conflicts, and the documented
   feature flags.
-- [ ] Map repeated category, engine, and domain flags to the search request.
-- [ ] Serialize the feature result types directly for `--json`; do not create a
+- [x] Map repeated category, engine, and domain flags to the search request.
+- [x] Serialize the feature result types directly for `--json`; do not create a
   second CLI-only schema.
-- [ ] Add compact `--plain` search output and restrained `owo-colors` styling
+- [x] Add compact `--plain` search output and restrained `owo-colors` styling
   for interactive terminals.
-- [ ] Disable styling for redirected output, `NO_COLOR`, `TERM=dumb`,
+- [x] Disable styling for redirected output, `NO_COLOR`, `TERM=dumb`,
   `--no-color`, `--json`, and `--plain`.
-- [ ] Keep data on stdout and progress, diagnostics, and errors on stderr.
-- [ ] Document exit codes and add examples to command help; ensure no-argument,
+- [x] Keep data on stdout and progress, diagnostics, and errors on stderr.
+- [x] Document exit codes and add examples to command help; ensure no-argument,
   `-h`, `--help`, `help <command>`, `--version`, and typo behavior follow the
   CLI Guidelines decisions in the roadmap without network access.
-- [ ] Smoke-test `search` against the T02 stack, then fetch one returned URL.
+- [x] Smoke-test `search` against the T02 stack, then fetch one returned URL.
 
 **Acceptance criteria:**
 
-- [ ] CLI flags use the same defaults and validation errors as direct service
+- [x] CLI flags use the same defaults and validation errors as direct service
   calls.
-- [ ] JSON output is valid when redirected and is not mixed with logs.
-- [ ] Help is concise, includes common examples, and does not paginate or prompt.
-- [ ] Tests cover argument counts, repeated flags, output modes, color rules,
+- [x] JSON output is valid when redirected and is not mixed with logs.
+- [x] Help is concise, includes common examples, and does not paginate or prompt.
+- [x] Tests cover argument counts, repeated flags, output modes, color rules,
   stream separation, exit codes, and cancellation.
-- [ ] The real search-then-fetch smoke flow succeeds against local infra.
+- [x] The real search-then-fetch smoke flow succeeds against local infra.
 
 **Verification:** `cargo test cli`, then run the documented CLI smoke flow
 against the T02 endpoint.

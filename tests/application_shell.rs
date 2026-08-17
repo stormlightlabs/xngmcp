@@ -21,10 +21,7 @@ fn application_shell_help_and_version_use_stdout_without_a_backend() {
 
 #[test]
 fn application_shell_usage_errors_use_stderr() {
-    let output = binary()
-        .arg("unknown-command")
-        .output()
-        .expect("run xngmcp");
+    let output = binary().arg("unknown-command").output().expect("run xngmcp");
 
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());

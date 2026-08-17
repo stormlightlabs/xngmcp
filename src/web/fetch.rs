@@ -46,16 +46,12 @@ pub struct FetchRequest {
 
 impl FetchRequest {
     pub fn new(url: impl Into<String>) -> Self {
-        Self {
-            url: url.into(),
-            max_chars: None,
-            format: None,
-        }
+        Self { url: url.into(), max_chars: None, format: None }
     }
 
     fn validate(self) -> Result<ValidatedFetchRequest, FetchError> {
-        let url = Url::parse(&self.url)
-            .map_err(|_| FetchError::validation("url must be an absolute HTTP or HTTPS URL"))?;
+        let url =
+            Url::parse(&self.url).map_err(|_| FetchError::validation("url must be an absolute HTTP or HTTPS URL"))?;
         validate_public_url(&url)?;
 
         let max_chars = self.max_chars.unwrap_or(DEFAULT_MAX_CHARS);
@@ -65,11 +61,7 @@ impl FetchRequest {
             )));
         }
 
-        Ok(ValidatedFetchRequest {
-            url,
-            max_chars,
-            format: self.format.unwrap_or_default(),
-        })
+        Ok(ValidatedFetchRequest { url, max_chars, format: self.format.unwrap_or_default() })
     }
 }
 
@@ -161,17 +153,11 @@ impl FetchService {
             .dns_resolver(Arc::new(PublicResolver))
             .build()
             .map_err(|_| FetchError::Transport)?;
-        Ok(Self {
-            client,
-            operation_timeout,
-            response_header_timeout: RESPONSE_HEADER_TIMEOUT,
-        })
+        Ok(Self { client, operation_timeout, response_header_timeout: RESPONSE_HEADER_TIMEOUT })
     }
 
     pub async fn fetch(
-        &self,
-        request: FetchRequest,
-        cancellation: CancellationToken,
+        &self, request: FetchRequest, cancellation: CancellationToken,
     ) -> Result<FetchResponse, FetchError> {
         let request = request.validate()?;
         let operation = timeout(self.operation_timeout, self.fetch_validated(request));
@@ -181,24 +167,14 @@ impl FetchService {
         }
     }
 
-    async fn fetch_validated(
-        &self,
-        request: ValidatedFetchRequest,
-    ) -> Result<FetchResponse, FetchError> {
-        let ValidatedFetchRequest {
-            mut url,
-            max_chars,
-            format,
-        } = request;
+    async fn fetch_validated(&self, request: ValidatedFetchRequest) -> Result<FetchResponse, FetchError> {
+        let ValidatedFetchRequest { mut url, max_chars, format } = request;
         for redirect_count in 0..=MAX_REDIRECTS {
             validate_public_url(&url)?;
-            let response = timeout(
-                self.response_header_timeout,
-                self.client.get(url.clone()).send(),
-            )
-            .await
-            .map_err(|_| FetchError::Timeout)?
-            .map_err(map_reqwest_error)?;
+            let response = timeout(self.response_header_timeout, self.client.get(url.clone()).send())
+                .await
+                .map_err(|_| FetchError::Timeout)?
+                .map_err(map_reqwest_error)?;
 
             if response.status().is_redirection() {
                 if redirect_count == MAX_REDIRECTS {
@@ -218,18 +194,12 @@ impl FetchService {
 
     #[cfg(test)]
     pub(crate) fn with_test_client(client: Client, operation_timeout: Duration) -> Self {
-        Self {
-            client,
-            operation_timeout,
-            response_header_timeout: RESPONSE_HEADER_TIMEOUT,
-        }
+        Self { client, operation_timeout, response_header_timeout: RESPONSE_HEADER_TIMEOUT }
     }
 }
 
 async fn response_to_fetch_result(
-    mut response: reqwest::Response,
-    max_chars: usize,
-    format: FetchFormat,
+    mut response: reqwest::Response, max_chars: usize, format: FetchFormat,
 ) -> Result<FetchResponse, FetchError> {
     let final_url = response.url().clone();
     validate_public_url(&final_url)?;
@@ -255,20 +225,12 @@ async fn response_to_fetch_result(
 
     let (title, content) = match media_type.as_str() {
         "text/plain" => (None, content),
-        "text/html" | "application/xhtml+xml" => {
-            extract_content(content, final_url.clone(), format).await?
-        }
+        "text/html" | "application/xhtml+xml" => extract_content(content, final_url.clone(), format).await?,
         _ => return Err(FetchError::UnsupportedMedia(content_type)),
     };
     let (content, truncated) = truncate_content(content, max_chars);
 
-    Ok(FetchResponse {
-        url: final_url.into(),
-        title,
-        content,
-        content_type,
-        truncated,
-    })
+    Ok(FetchResponse { url: final_url.into(), title, content, content_type, truncated })
 }
 
 async fn read_limited_body(response: &mut reqwest::Response) -> Result<Vec<u8>, FetchError> {
@@ -282,16 +244,11 @@ async fn read_limited_body(response: &mut reqwest::Response) -> Result<Vec<u8>, 
     Ok(body)
 }
 
-async fn extract_content(
-    html: String,
-    url: Url,
-    format: FetchFormat,
-) -> Result<(Option<String>, String), FetchError> {
-    let extraction =
-        spawn_blocking(move || extract(&html, Some(url.as_str()), &ReadabilityOptions::default()))
-            .await
-            .map_err(|_| FetchError::NoArticle)?
-            .map_err(FetchError::Extraction)?;
+async fn extract_content(html: String, url: Url, format: FetchFormat) -> Result<(Option<String>, String), FetchError> {
+    let extraction = spawn_blocking(move || extract(&html, Some(url.as_str()), &ReadabilityOptions::default()))
+        .await
+        .map_err(|_| FetchError::NoArticle)?
+        .map_err(FetchError::Extraction)?;
     let article = extraction.ok_or(FetchError::NoArticle)?;
     let content = match format {
         FetchFormat::Markdown => article.markdown,
@@ -300,17 +257,12 @@ async fn extract_content(
     if content.trim().is_empty() {
         return Err(FetchError::NoArticle);
     }
-    Ok((
-        article.title.filter(|title| !title.trim().is_empty()),
-        content,
-    ))
+    Ok((article.title.filter(|title| !title.trim().is_empty()), content))
 }
 
 fn validate_public_url(url: &Url) -> Result<(), FetchError> {
     if !matches!(url.scheme(), "http" | "https") || url.host().is_none() {
-        return Err(FetchError::validation(
-            "url must be an absolute HTTP or HTTPS URL",
-        ));
+        return Err(FetchError::validation("url must be an absolute HTTP or HTTPS URL"));
     }
     if !url.username().is_empty() || url.password().is_some() {
         return Err(FetchError::validation("URLs must not contain credentials"));
@@ -324,16 +276,11 @@ fn validate_public_url(url: &Url) -> Result<(), FetchError> {
     Ok(())
 }
 
-fn redirect_target(
-    current: &Url,
-    location: Option<&reqwest::header::HeaderValue>,
-) -> Result<Url, FetchError> {
+fn redirect_target(current: &Url, location: Option<&reqwest::header::HeaderValue>) -> Result<Url, FetchError> {
     let location = location
         .and_then(|value| value.to_str().ok())
         .ok_or(FetchError::InvalidRedirect)?;
-    let target = current
-        .join(location)
-        .map_err(|_| FetchError::InvalidRedirect)?;
+    let target = current.join(location).map_err(|_| FetchError::InvalidRedirect)?;
     validate_public_url(&target).map_err(|_| FetchError::InvalidRedirect)?;
     Ok(target)
 }
@@ -355,8 +302,9 @@ fn parse_content_type(content_type: &str) -> Result<(String, Option<&str>), Fetc
 
 fn decode_body(body: &[u8], charset: Option<&str>) -> Result<String, FetchError> {
     let encoding = match charset {
-        Some(charset) => Encoding::for_label(charset.as_bytes())
-            .ok_or_else(|| FetchError::UnsupportedCharset(charset.to_owned()))?,
+        Some(charset) => {
+            Encoding::for_label(charset.as_bytes()).ok_or_else(|| FetchError::UnsupportedCharset(charset.to_owned()))?
+        }
         None => UTF_8,
     };
     Ok(encoding.decode(body).0.into_owned())
@@ -370,11 +318,7 @@ fn truncate_content(content: String, max_chars: usize) -> (String, bool) {
 }
 
 fn map_reqwest_error(error: reqwest::Error) -> FetchError {
-    if error.is_timeout() {
-        FetchError::Timeout
-    } else {
-        FetchError::Transport
-    }
+    if error.is_timeout() { FetchError::Timeout } else { FetchError::Transport }
 }
 
 #[derive(Debug)]
@@ -390,11 +334,7 @@ impl Resolve for PublicResolver {
             }
             for address in &addresses {
                 if is_blocked_address(address.ip()) {
-                    return Err(io::Error::other(format!(
-                        "host resolved to blocked address {}",
-                        address.ip()
-                    ))
-                    .into());
+                    return Err(io::Error::other(format!("host resolved to blocked address {}", address.ip())).into());
                 }
             }
             Ok(Box::new(addresses.into_iter()) as Addrs)
@@ -403,11 +343,7 @@ impl Resolve for PublicResolver {
 }
 
 fn validate_public_address(address: IpAddr) -> Result<(), FetchError> {
-    if is_blocked_address(address) {
-        Err(FetchError::BlockedAddress(address))
-    } else {
-        Ok(())
-    }
+    if is_blocked_address(address) { Err(FetchError::BlockedAddress(address)) } else { Ok(()) }
 }
 
 fn is_blocked_address(address: IpAddr) -> bool {
@@ -442,13 +378,15 @@ fn is_blocked_ipv6(address: Ipv6Addr) -> bool {
         return true;
     }
 
-    let embedded_ipv4 =
-        match segments {
-            [0, 0, 0, 0, 0, 0, high, low] | [0, 0, 0, 0, 0, 0xffff, high, low] => Some(
-                Ipv4Addr::new((high >> 8) as u8, high as u8, (low >> 8) as u8, low as u8),
-            ),
-            _ => None,
-        };
+    let embedded_ipv4 = match segments {
+        [0, 0, 0, 0, 0, 0, high, low] | [0, 0, 0, 0, 0, 0xffff, high, low] => Some(Ipv4Addr::new(
+            (high >> 8) as u8,
+            high as u8,
+            (low >> 8) as u8,
+            low as u8,
+        )),
+        _ => None,
+    };
     embedded_ipv4.is_some_and(is_blocked_ipv4)
 }
 
@@ -475,14 +413,8 @@ mod tests {
         for request in [
             FetchRequest::new("file:///tmp/article"),
             FetchRequest::new("http://user:secret@example.com/article"),
-            FetchRequest {
-                max_chars: Some(999),
-                ..FetchRequest::new("https://example.com")
-            },
-            FetchRequest {
-                max_chars: Some(100_001),
-                ..FetchRequest::new("https://example.com")
-            },
+            FetchRequest { max_chars: Some(999), ..FetchRequest::new("https://example.com") },
+            FetchRequest { max_chars: Some(100_001), ..FetchRequest::new("https://example.com") },
         ] {
             assert!(request.validate().is_err());
         }
@@ -506,15 +438,10 @@ mod tests {
             "ff02::1",
             "::ffff:127.0.0.1",
         ] {
-            assert!(
-                is_blocked_address(address.parse().expect("IP address")),
-                "{address}"
-            );
+            assert!(is_blocked_address(address.parse().expect("IP address")), "{address}");
         }
         assert!(!is_blocked_address("8.8.8.8".parse().expect("public IP")));
-        assert!(!is_blocked_address(
-            "2606:4700:4700::1111".parse().expect("public IP")
-        ));
+        assert!(!is_blocked_address("2606:4700:4700::1111".parse().expect("public IP")));
     }
 
     #[tokio::test]
@@ -531,16 +458,8 @@ mod tests {
             "Readable article content. ".repeat(40)
         );
         let responses = vec![
-            http_response(
-                "200 OK",
-                "text/html; charset=windows-1252",
-                article.as_bytes(),
-            ),
-            http_response(
-                "200 OK",
-                "text/plain; charset=windows-1252",
-                b"plain public text",
-            ),
+            http_response("200 OK", "text/html; charset=windows-1252", article.as_bytes()),
+            http_response("200 OK", "text/plain; charset=windows-1252", b"plain public text"),
         ];
         let (url, server) = fixture(responses).await;
         let service = fixture_service(url.port().expect("fixture port"));
@@ -555,11 +474,7 @@ mod tests {
 
         let text = service
             .fetch(
-                FetchRequest {
-                    url: url.into(),
-                    max_chars: Some(1_000),
-                    format: Some(FetchFormat::Text),
-                },
+                FetchRequest { url: url.into(), max_chars: Some(1_000), format: Some(FetchFormat::Text) },
                 CancellationToken::new(),
             )
             .await
@@ -625,9 +540,7 @@ mod tests {
             cancellation_to_trigger.cancel();
         });
         assert!(matches!(
-            service
-                .fetch(FetchRequest::new(url.as_str()), cancellation)
-                .await,
+            service.fetch(FetchRequest::new(url.as_str()), cancellation).await,
             Err(FetchError::Cancelled)
         ));
         server.await.expect("fixture completes");
@@ -636,20 +549,16 @@ mod tests {
     #[tokio::test]
     async fn fetch_selects_readable_formats_and_truncates_on_unicode_boundaries() {
         assert_eq!(truncate_content("ab🦀cd".into(), 3), ("ab🦀".into(), true));
-        assert_eq!(
-            truncate_content("ab🦀cd".into(), 5),
-            ("ab🦀cd".into(), false)
-        );
+        assert_eq!(truncate_content("ab🦀cd".into(), 5), ("ab🦀cd".into(), false));
 
         let html = format!(
             "<html><head><title>Example title</title></head><body><article><h1>Example title</h1><p>{}</p></article></body></html>",
             "Readable article content. ".repeat(40)
         );
         let url = Url::parse("https://example.com/article").expect("test URL");
-        let (markdown_title, markdown) =
-            extract_content(html.clone(), url.clone(), FetchFormat::Markdown)
-                .await
-                .expect("Markdown extraction");
+        let (markdown_title, markdown) = extract_content(html.clone(), url.clone(), FetchFormat::Markdown)
+            .await
+            .expect("Markdown extraction");
         let (_, text) = extract_content(html, url, FetchFormat::Text)
             .await
             .expect("text extraction");
@@ -695,9 +604,7 @@ mod tests {
     }
 
     async fn fixture(responses: Vec<String>) -> (Url, tokio::task::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind fixture");
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind fixture");
         let address = listener.local_addr().expect("fixture address");
         let server = tokio::spawn(async move {
             let mut responses = VecDeque::from(responses);
@@ -705,10 +612,7 @@ mod tests {
                 let (mut stream, _) = listener.accept().await.expect("accept request");
                 let mut request = [0; 1024];
                 let _ = stream.read(&mut request).await.expect("read request");
-                stream
-                    .write_all(response.as_bytes())
-                    .await
-                    .expect("write response");
+                stream.write_all(response.as_bytes()).await.expect("write response");
             }
         });
         (
@@ -718,9 +622,7 @@ mod tests {
     }
 
     async fn delayed_fixture() -> (Url, tokio::task::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind fixture");
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind fixture");
         let address = listener.local_addr().expect("fixture address");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.expect("accept request");

@@ -148,12 +148,7 @@ fn searxng_fixture() -> (String, thread::JoinHandle<String>) {
     )
 }
 
-fn hanging_searxng_fixture() -> (
-    String,
-    mpsc::Receiver<()>,
-    mpsc::Sender<()>,
-    thread::JoinHandle<()>,
-) {
+fn hanging_searxng_fixture() -> (String, mpsc::Receiver<()>, mpsc::Sender<()>, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind fixture");
     let url = format!("http://{}", listener.local_addr().expect("fixture address"));
     let (started_sender, started_receiver) = mpsc::channel();

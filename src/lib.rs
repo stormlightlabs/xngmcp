@@ -64,10 +64,7 @@ pub async fn run() -> ExitCode {
         return report_error(error.into());
     }
 
-    tracing::debug!(
-        color_enabled = !config.no_color,
-        "resolved application settings"
-    );
+    tracing::debug!(color_enabled = !config.no_color, "resolved application settings");
 
     let cancellation = CancellationToken::new();
     let shutdown_listener = spawn_shutdown_listener(cancellation.clone());
@@ -92,17 +89,14 @@ fn init_tracing(level: tracing_subscriber::filter::LevelFilter) -> anyhow::Resul
 }
 
 fn make_subscriber<W>(
-    level: tracing_subscriber::filter::LevelFilter,
-    writer: W,
+    level: tracing_subscriber::filter::LevelFilter, writer: W,
 ) -> impl tracing::Subscriber + Send + Sync
 where
     W: for<'writer> MakeWriter<'writer> + Send + Sync + 'static,
 {
-    tracing_subscriber::registry().with(level).with(
-        tracing_subscriber::fmt::layer()
-            .with_ansi(false)
-            .with_writer(writer),
-    )
+    tracing_subscriber::registry()
+        .with(level)
+        .with(tracing_subscriber::fmt::layer().with_ansi(false).with_writer(writer))
 }
 
 fn spawn_shutdown_listener(cancellation: CancellationToken) -> JoinHandle<()> {
@@ -131,11 +125,7 @@ async fn wait_for_shutdown_signal() -> io::Result<()> {
     tokio::signal::ctrl_c().await
 }
 
-async fn dispatch(
-    command: &Command,
-    config: &Config,
-    cancellation: CancellationToken,
-) -> Result<(), AppError> {
+async fn dispatch(command: &Command, config: &Config, cancellation: CancellationToken) -> Result<(), AppError> {
     match command {
         Command::Search {
             query,
@@ -170,12 +160,7 @@ async fn dispatch(
             };
             search(config, request, *json, *plain, cancellation).await
         }
-        Command::Fetch {
-            url,
-            max_chars,
-            format,
-            json,
-        } => {
+        Command::Fetch { url, max_chars, format, json } => {
             let request = FetchRequest {
                 url: url.clone(),
                 max_chars: *max_chars,
@@ -192,11 +177,7 @@ async fn dispatch(
 }
 
 async fn search(
-    config: &Config,
-    request: SearchRequest,
-    json: bool,
-    plain: bool,
-    cancellation: CancellationToken,
+    config: &Config, request: SearchRequest, json: bool, plain: bool, cancellation: CancellationToken,
 ) -> Result<(), AppError> {
     let service = SearchService::with_default_timeout(config.searxng_url.clone())
         .map_err(|error| AppError::Runtime(error.into()))?;
@@ -209,27 +190,18 @@ async fn search(
     if json {
         output::write_json(&mut stdout, &response).context("could not write search result")?;
     } else if plain {
-        output::write_plain_search(&mut stdout, &response)
-            .context("could not write search result")?;
+        output::write_plain_search(&mut stdout, &response).context("could not write search result")?;
     } else {
-        output::write_human_search(
-            &mut stdout,
-            &response,
-            output::color_enabled(config.no_color),
-        )
-        .context("could not write search result")?;
+        output::write_human_search(&mut stdout, &response, output::color_enabled(config.no_color))
+            .context("could not write search result")?;
     }
     Ok(())
 }
 
 async fn fetch(
-    config: &Config,
-    request: FetchRequest,
-    json: bool,
-    cancellation: CancellationToken,
+    config: &Config, request: FetchRequest, json: bool, cancellation: CancellationToken,
 ) -> Result<(), AppError> {
-    let service =
-        FetchService::with_default_timeout().map_err(|error| AppError::Runtime(error.into()))?;
+    let service = FetchService::with_default_timeout().map_err(|error| AppError::Runtime(error.into()))?;
     let status = output::StatusLine::start(output::status_enabled(), "Fetching…");
     let response = service.fetch(request, cancellation).await;
     drop(status);
@@ -239,12 +211,8 @@ async fn fetch(
     if json {
         output::write_json(&mut stdout, &response).context("could not write fetched content")?;
     } else {
-        output::write_human_fetch(
-            &mut stdout,
-            &response,
-            output::color_enabled(config.no_color),
-        )
-        .context("could not write fetched content")?;
+        output::write_human_fetch(&mut stdout, &response, output::color_enabled(config.no_color))
+            .context("could not write fetched content")?;
     }
     Ok(())
 }
@@ -266,17 +234,13 @@ fn map_fetch_error(error: FetchError) -> AppError {
 async fn serve(config: &Config, cancellation: CancellationToken) -> Result<(), AppError> {
     let search = SearchService::with_default_timeout(config.searxng_url.clone())
         .map_err(|error| AppError::Runtime(error.into()))?;
-    let fetch =
-        FetchService::with_default_timeout().map_err(|error| AppError::Runtime(error.into()))?;
+    let fetch = FetchService::with_default_timeout().map_err(|error| AppError::Runtime(error.into()))?;
     let server = mcp::McpServer::new(search, fetch, cancellation.clone());
     tracing::debug!(
         searxng_origin = %config.searxng_url.origin().ascii_serialization(),
         "starting stdio MCP server"
     );
-    let service = match server
-        .serve_with_ct(rmcp::transport::stdio(), cancellation)
-        .await
-    {
+    let service = match server.serve_with_ct(rmcp::transport::stdio(), cancellation).await {
         Ok(service) => service,
         Err(rmcp::service::ServerInitializeError::Cancelled)
         | Err(rmcp::service::ServerInitializeError::ConnectionClosed(_)) => return Ok(()),
@@ -311,10 +275,7 @@ mod tests {
 
     impl Write for LockedBufferWriter {
         fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
-            self.0
-                .lock()
-                .expect("test buffer lock")
-                .extend_from_slice(buffer);
+            self.0.lock().expect("test buffer lock").extend_from_slice(buffer);
             Ok(buffer.len())
         }
 
@@ -341,8 +302,8 @@ mod tests {
 
         tracing::subscriber::with_default(subscriber, || tracing::debug!("test diagnostic"));
 
-        let output = String::from_utf8(output.lock().expect("test buffer lock").clone())
-            .expect("tracing output is UTF-8");
+        let output =
+            String::from_utf8(output.lock().expect("test buffer lock").clone()).expect("tracing output is UTF-8");
         assert!(output.contains("test diagnostic"));
     }
 
@@ -360,11 +321,7 @@ mod tests {
             cancellation_to_trigger.cancel();
         });
 
-        assert!(
-            dispatch(&Command::Serve, &config, cancellation)
-                .await
-                .is_ok()
-        );
+        assert!(dispatch(&Command::Serve, &config, cancellation).await.is_ok());
     }
 
     #[test]
@@ -372,14 +329,13 @@ mod tests {
         let assets_directory = Path::new(env!("XNGMCP_GENERATED_DIR"));
         let man_directory = assets_directory.join("man");
         let completions_directory = assets_directory.join("completions");
-        let root_man_page =
-            fs::read_to_string(man_directory.join("xngmcp.1")).expect("root man page is generated");
-        let serve_man_page = fs::read_to_string(man_directory.join("xngmcp-serve.1"))
-            .expect("serve man page is generated");
-        let search_man_page = fs::read_to_string(man_directory.join("xngmcp-search.1"))
-            .expect("search man page is generated");
-        let fetch_man_page = fs::read_to_string(man_directory.join("xngmcp-fetch.1"))
-            .expect("fetch man page is generated");
+        let root_man_page = fs::read_to_string(man_directory.join("xngmcp.1")).expect("root man page is generated");
+        let serve_man_page =
+            fs::read_to_string(man_directory.join("xngmcp-serve.1")).expect("serve man page is generated");
+        let search_man_page =
+            fs::read_to_string(man_directory.join("xngmcp-search.1")).expect("search man page is generated");
+        let fetch_man_page =
+            fs::read_to_string(man_directory.join("xngmcp-fetch.1")).expect("fetch man page is generated");
 
         assert!(root_man_page.contains("searxng\\-url"));
         assert!(root_man_page.contains("search"));
@@ -388,13 +344,7 @@ mod tests {
         assert!(search_man_page.contains("include\\-domain"));
         assert!(fetch_man_page.contains("max\\-chars"));
 
-        for completion in [
-            "xngmcp.bash",
-            "_xngmcp",
-            "xngmcp.fish",
-            "xngmcp.elv",
-            "_xngmcp.ps1",
-        ] {
+        for completion in ["xngmcp.bash", "_xngmcp", "xngmcp.fish", "xngmcp.elv", "_xngmcp.ps1"] {
             let contents = fs::read_to_string(completions_directory.join(completion))
                 .unwrap_or_else(|_| panic!("{completion} completion is generated"));
             assert!(contents.contains("serve"));

@@ -30,8 +30,8 @@ impl Config {
             .map(str::to_owned)
             .or_else(|| environment("SEARXNG_URL"))
             .unwrap_or_else(|| DEFAULT_SEARXNG_URL.to_owned());
-        let searxng_url = Url::parse(&searxng_url)
-            .map_err(|error| AppError::usage(format!("invalid SearXNG URL: {error}")))?;
+        let searxng_url =
+            Url::parse(&searxng_url).map_err(|error| AppError::usage(format!("invalid SearXNG URL: {error}")))?;
 
         if !matches!(searxng_url.scheme(), "http" | "https") || searxng_url.host().is_none() {
             return Err(AppError::usage(
@@ -46,15 +46,12 @@ impl Config {
             .or_else(|| environment("XNGMCP_LOG_LEVEL"))
             .unwrap_or_else(|| DEFAULT_LOG_LEVEL.to_owned())
             .parse::<LevelFilter>()
-            .map_err(|_| {
-                AppError::usage("invalid log level: use error, warn, info, debug, or trace")
-            })?;
+            .map_err(|_| AppError::usage("invalid log level: use error, warn, info, debug, or trace"))?;
 
         Ok(Self {
             searxng_url,
             log_level,
-            no_color: cli.no_color
-                || environment("NO_COLOR").is_some_and(|value| !value.is_empty()),
+            no_color: cli.no_color || environment("NO_COLOR").is_some_and(|value| !value.is_empty()),
         })
     }
 }
@@ -92,12 +89,7 @@ mod tests {
 
     #[test]
     fn application_shell_configuration_uses_environment_then_defaults() {
-        let cli = Cli {
-            searxng_url: None,
-            log_level: None,
-            no_color: false,
-            command: Command::Serve,
-        };
+        let cli = Cli { searxng_url: None, log_level: None, no_color: false, command: Command::Serve };
         let environment = |name: &str| match name {
             "SEARXNG_URL" => Some("https://environment.example".into()),
             "XNGMCP_LOG_LEVEL" => Some("info".into()),
@@ -111,10 +103,7 @@ mod tests {
         assert!(config.no_color);
 
         let defaults = Config::resolve(&cli, |_| None).expect("defaults are valid");
-        assert_eq!(
-            defaults.searxng_url.as_str(),
-            format!("{DEFAULT_SEARXNG_URL}/")
-        );
+        assert_eq!(defaults.searxng_url.as_str(), format!("{DEFAULT_SEARXNG_URL}/"));
         assert_eq!(defaults.log_level, LevelFilter::WARN);
         assert!(!defaults.no_color);
     }
@@ -127,12 +116,8 @@ mod tests {
             no_color: false,
             command: Command::Serve,
         };
-        let invalid_log_level = Cli {
-            searxng_url: None,
-            log_level: Some("loud".into()),
-            no_color: false,
-            command: Command::Serve,
-        };
+        let invalid_log_level =
+            Cli { searxng_url: None, log_level: Some("loud".into()), no_color: false, command: Command::Serve };
 
         assert!(Config::resolve(&invalid_url, |_| None).is_err());
         assert!(Config::resolve(&invalid_log_level, |_| None).is_err());

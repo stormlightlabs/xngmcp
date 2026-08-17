@@ -97,12 +97,7 @@ impl SearchRequest {
         }
 
         let language = validate_language(self.language.as_deref().unwrap_or(DEFAULT_LANGUAGE))?;
-        let categories = validate_values(
-            "categories",
-            self.categories,
-            MAX_LIST_VALUES,
-            &[DEFAULT_CATEGORY],
-        )?;
+        let categories = validate_values("categories", self.categories, MAX_LIST_VALUES, &[DEFAULT_CATEGORY])?;
         let engines = validate_values("engines", self.engines, MAX_LIST_VALUES, &[])?;
 
         let safe_search = self.safe_search.unwrap_or(1);
@@ -225,9 +220,7 @@ impl SearchService {
     }
 
     pub async fn search(
-        &self,
-        request: SearchRequest,
-        cancellation: CancellationToken,
+        &self, request: SearchRequest, cancellation: CancellationToken,
     ) -> Result<SearchResponse, SearchError> {
         let request = request.validate()?;
         let parameters = request.parameters();
@@ -246,8 +239,7 @@ impl SearchService {
             _ = cancellation.cancelled() => return Err(SearchError::Cancelled),
             result = response.text() => result.map_err(map_reqwest_error)?
         };
-        let upstream: UpstreamResponse =
-            serde_json::from_str(&body).map_err(|_| SearchError::MalformedResponse)?;
+        let upstream: UpstreamResponse = serde_json::from_str(&body).map_err(|_| SearchError::MalformedResponse)?;
 
         Ok(request.normalize(upstream))
     }
@@ -331,10 +323,7 @@ struct UpstreamResult {
     engines: Vec<String>,
 }
 
-fn normalize_result(
-    result: UpstreamResult,
-    request: &ValidatedSearchRequest,
-) -> Option<SearchResult> {
+fn normalize_result(result: UpstreamResult, request: &ValidatedSearchRequest) -> Option<SearchResult> {
     let mut url = Url::parse(&result.url).ok()?;
     if !matches!(url.scheme(), "http" | "https")
         || url.host().is_none()
@@ -371,12 +360,9 @@ fn matches_domain_list(host: &str, domains: &[String], default_when_empty: bool)
         return default_when_empty;
     }
 
-    domains.iter().any(|domain| {
-        host == domain
-            || host
-                .strip_suffix(domain)
-                .is_some_and(|prefix| prefix.ends_with('.'))
-    })
+    domains
+        .iter()
+        .any(|domain| host == domain || host.strip_suffix(domain).is_some_and(|prefix| prefix.ends_with('.')))
 }
 
 fn option_vec_is_empty<T>(value: &Option<Vec<T>>) -> bool {
@@ -388,10 +374,7 @@ fn option_string_is_blank(value: &Option<String>) -> bool {
 }
 
 fn useful_strings(values: Vec<String>) -> Option<Vec<String>> {
-    let values: Vec<_> = values
-        .into_iter()
-        .filter(|value| !value.trim().is_empty())
-        .collect();
+    let values: Vec<_> = values.into_iter().filter(|value| !value.trim().is_empty()).collect();
     (!values.is_empty()).then_some(values)
 }
 
@@ -444,10 +427,7 @@ fn validate_language(value: &str) -> Result<String, SearchError> {
 }
 
 fn validate_values(
-    name: &str,
-    values: Vec<String>,
-    maximum: usize,
-    default: &[&str],
+    name: &str, values: Vec<String>, maximum: usize, default: &[&str],
 ) -> Result<Vec<String>, SearchError> {
     if values.len() > maximum {
         return Err(SearchError::validation(format!(
@@ -455,14 +435,9 @@ fn validate_values(
         )));
     }
 
-    let values: Vec<_> = values
-        .into_iter()
-        .map(|value| value.trim().to_owned())
-        .collect();
+    let values: Vec<_> = values.into_iter().map(|value| value.trim().to_owned()).collect();
     if values.iter().any(String::is_empty) {
-        return Err(SearchError::validation(format!(
-            "{name} must not contain blank values"
-        )));
+        return Err(SearchError::validation(format!("{name} must not contain blank values")));
     }
 
     if values.is_empty() {
@@ -493,14 +468,9 @@ fn normalize_domain(name: &str, domain: &str) -> Result<String, SearchError> {
         )));
     }
 
-    let url = Url::parse(&format!("http://{domain}")).map_err(|_| {
-        SearchError::validation(format!("{name} must contain normalized hostnames"))
-    })?;
-    if url.port().is_some()
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.path() != "/"
-    {
+    let url = Url::parse(&format!("http://{domain}"))
+        .map_err(|_| SearchError::validation(format!("{name} must contain normalized hostnames")))?;
+    if url.port().is_some() || !url.username().is_empty() || url.password().is_some() || url.path() != "/" {
         return Err(SearchError::validation(format!(
             "{name} must contain hostnames without ports or paths"
         )));
@@ -508,9 +478,7 @@ fn normalize_domain(name: &str, domain: &str) -> Result<String, SearchError> {
 
     match url.host() {
         Some(Host::Domain(host)) => Ok(host.to_ascii_lowercase()),
-        _ => Err(SearchError::validation(format!(
-            "{name} must contain domain hostnames"
-        ))),
+        _ => Err(SearchError::validation(format!("{name} must contain domain hostnames"))),
     }
 }
 
@@ -518,18 +486,12 @@ fn search_endpoint(searxng_url: Url) -> Result<Url, SearchError> {
     if searxng_url.path().ends_with("/search") {
         Ok(searxng_url)
     } else {
-        searxng_url
-            .join("search")
-            .map_err(|_| SearchError::Transport)
+        searxng_url.join("search").map_err(|_| SearchError::Transport)
     }
 }
 
 fn map_reqwest_error(error: reqwest::Error) -> SearchError {
-    if error.is_timeout() {
-        SearchError::Timeout
-    } else {
-        SearchError::Transport
-    }
+    if error.is_timeout() { SearchError::Timeout } else { SearchError::Transport }
 }
 
 #[cfg(test)]
@@ -595,52 +557,31 @@ mod tests {
         let cases = [
             (SearchRequest::new(" "), "query must not be blank"),
             (
-                SearchRequest {
-                    limit: Some(21),
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { limit: Some(21), ..SearchRequest::new("query") },
                 "limit must be between",
             ),
             (
-                SearchRequest {
-                    page: Some(0),
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { page: Some(0), ..SearchRequest::new("query") },
                 "page must be between",
             ),
             (
-                SearchRequest {
-                    language: Some(" ".into()),
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { language: Some(" ".into()), ..SearchRequest::new("query") },
                 "language must be",
             ),
             (
-                SearchRequest {
-                    safe_search: Some(3),
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { safe_search: Some(3), ..SearchRequest::new("query") },
                 "safe_search must be",
             ),
             (
-                SearchRequest {
-                    categories: vec![String::new()],
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { categories: vec![String::new()], ..SearchRequest::new("query") },
                 "categories must not",
             ),
             (
-                SearchRequest {
-                    engines: vec!["engine".into(); 11],
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { engines: vec!["engine".into(); 11], ..SearchRequest::new("query") },
                 "engines accepts",
             ),
             (
-                SearchRequest {
-                    include_domains: vec!["example.com:443".into()],
-                    ..SearchRequest::new("query")
-                },
+                SearchRequest { include_domains: vec!["example.com:443".into()], ..SearchRequest::new("query") },
                 "without ports",
             ),
         ];
@@ -787,14 +728,8 @@ mod tests {
         );
         server.await.expect("server completes");
 
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind listener");
-        let endpoint = Url::parse(&format!(
-            "http://{}/",
-            listener.local_addr().expect("address")
-        ))
-        .expect("URL");
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
+        let endpoint = Url::parse(&format!("http://{}/", listener.local_addr().expect("address"))).expect("URL");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.expect("accept request");
             let mut request = [0; 1024];
@@ -810,14 +745,8 @@ mod tests {
         );
         server.abort();
 
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind listener");
-        let endpoint = Url::parse(&format!(
-            "http://{}/",
-            listener.local_addr().expect("address")
-        ))
-        .expect("URL");
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
+        let endpoint = Url::parse(&format!("http://{}/", listener.local_addr().expect("address"))).expect("URL");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.expect("accept request");
             let mut request = [0; 1024];
@@ -832,9 +761,7 @@ mod tests {
             cancellation_to_trigger.cancel();
         });
         assert_eq!(
-            service
-                .search(SearchRequest::new("rust"), cancellation)
-                .await,
+            service.search(SearchRequest::new("rust"), cancellation).await,
             Err(SearchError::Cancelled)
         );
         server.abort();
@@ -879,27 +806,14 @@ mod tests {
 
         assert_eq!(response.query, "rust programming language");
         assert!(!response.results.is_empty());
-        assert!(
-            response
-                .results
-                .iter()
-                .all(|result| Url::parse(&result.url).is_ok())
-        );
+        assert!(response.results.iter().all(|result| Url::parse(&result.url).is_ok()));
     }
 
     async fn fixture(
-        status: StatusCode,
-        body: &'static str,
-        seen_target: Option<Arc<Mutex<Option<String>>>>,
+        status: StatusCode, body: &'static str, seen_target: Option<Arc<Mutex<Option<String>>>>,
     ) -> (Url, tokio::task::JoinHandle<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0")
-            .await
-            .expect("bind listener");
-        let endpoint = Url::parse(&format!(
-            "http://{}/",
-            listener.local_addr().expect("address")
-        ))
-        .expect("URL");
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind listener");
+        let endpoint = Url::parse(&format!("http://{}/", listener.local_addr().expect("address"))).expect("URL");
         let server = tokio::spawn(async move {
             let (mut stream, _) = listener.accept().await.expect("accept request");
             let mut request = Vec::new();
@@ -928,10 +842,7 @@ mod tests {
                 body.len(),
                 body
             );
-            stream
-                .write_all(response.as_bytes())
-                .await
-                .expect("write response");
+            stream.write_all(response.as_bytes()).await.expect("write response");
         });
         (endpoint, server)
     }

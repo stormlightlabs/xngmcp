@@ -22,23 +22,11 @@ pub(crate) struct McpServer {
 }
 
 impl McpServer {
-    pub(crate) fn new(
-        search: SearchService,
-        fetch: FetchService,
-        cancellation: CancellationToken,
-    ) -> Self {
-        Self {
-            search,
-            fetch,
-            cancellation,
-            tool_router: Self::tool_router(),
-        }
+    pub(crate) fn new(search: SearchService, fetch: FetchService, cancellation: CancellationToken) -> Self {
+        Self { search, fetch, cancellation, tool_router: Self::tool_router() }
     }
 
-    fn request_cancellation(
-        &self,
-        request_cancellation: CancellationToken,
-    ) -> (CancellationToken, JoinHandle<()>) {
+    fn request_cancellation(&self, request_cancellation: CancellationToken) -> (CancellationToken, JoinHandle<()>) {
         let cancellation = CancellationToken::new();
         let cancellation_to_trigger = cancellation.clone();
         let root_cancellation = self.cancellation.clone();
@@ -59,9 +47,7 @@ impl McpServer {
         description = "Search the public web. Use domain filters when the request needs a specific site. Results contain titles, URLs, snippets, scores, and available publication dates."
     )]
     async fn web_search(
-        &self,
-        Parameters(request): Parameters<SearchRequest>,
-        request_cancellation: CancellationToken,
+        &self, Parameters(request): Parameters<SearchRequest>, request_cancellation: CancellationToken,
     ) -> CallToolResult {
         let (cancellation, watcher) = self.request_cancellation(request_cancellation);
         let result = self.search.search(request, cancellation).await;
@@ -91,9 +77,7 @@ impl McpServer {
         description = "Fetch bounded, readable Markdown or text from a public HTTP(S) URL. Use a returned search URL when possible. Local networks, unsupported media, and pages without a readable article are rejected."
     )]
     async fn web_fetch(
-        &self,
-        Parameters(request): Parameters<FetchRequest>,
-        request_cancellation: CancellationToken,
+        &self, Parameters(request): Parameters<FetchRequest>, request_cancellation: CancellationToken,
     ) -> CallToolResult {
         let (cancellation, watcher) = self.request_cancellation(request_cancellation);
         let result = self.fetch.fetch(request, cancellation).await;
@@ -128,15 +112,7 @@ fn search_text_fallback(response: &SearchResponse) -> String {
         .results
         .iter()
         .enumerate()
-        .map(|(index, result)| {
-            format!(
-                "{}. {}\n{}\n{}",
-                index + 1,
-                result.title,
-                result.url,
-                result.snippet
-            )
-        })
+        .map(|(index, result)| format!("{}. {}\n{}\n{}", index + 1, result.title, result.url, result.snippet))
         .collect::<Vec<_>>()
         .join("\n\n");
     format!("Search results for {}:\n\n{results}", response.query)
@@ -148,11 +124,7 @@ fn fetch_text_fallback(response: &FetchResponse) -> String {
         .as_deref()
         .map(|title| format!("# {title}\n\n"))
         .unwrap_or_default();
-    let truncated = if response.truncated {
-        "\n\n[Content truncated.]"
-    } else {
-        ""
-    };
+    let truncated = if response.truncated { "\n\n[Content truncated.]" } else { "" };
 
     format!(
         "Source: {}\nContent type: {}\n\n{title}{}{truncated}",
@@ -202,8 +174,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn web_search_mcp_discovers_schema_and_keeps_sessions_usable_after_errors()
-    -> anyhow::Result<()> {
+    async fn web_search_mcp_discovers_schema_and_keeps_sessions_usable_after_errors() -> anyhow::Result<()> {
         let (url, backend) = fixture_server(vec![
             (503, r#"{"error":"unavailable"}"#),
             (
@@ -270,9 +241,7 @@ mod tests {
                 .is_some_and(|text| text.text.contains("query must not be blank"))
         );
 
-        let backend_failure = client
-            .call_tool(tool_call(json!({ "query": "rust" })))
-            .await?;
+        let backend_failure = client.call_tool(tool_call(json!({ "query": "rust" }))).await?;
         assert_eq!(backend_failure.is_error, Some(true));
         assert!(
             backend_failure.content[0]
@@ -280,9 +249,7 @@ mod tests {
                 .is_some_and(|text| text.text.contains("SearXNG returned HTTP 503"))
         );
 
-        let result = client
-            .call_tool(tool_call(json!({ "query": "rust" })))
-            .await?;
+        let result = client.call_tool(tool_call(json!({ "query": "rust" }))).await?;
         assert_eq!(result.is_error, Some(false));
         let structured = result
             .structured_content
@@ -298,10 +265,7 @@ mod tests {
             .await?;
         let mut cli_json = Vec::new();
         output::write_json(&mut cli_json, &expected)?;
-        assert_eq!(
-            structured,
-            serde_json::from_slice::<serde_json::Value>(&cli_json)?
-        );
+        assert_eq!(structured, serde_json::from_slice::<serde_json::Value>(&cli_json)?);
 
         client.cancel().await?;
         server_task.await??;
@@ -329,11 +293,7 @@ mod tests {
         let client = TestClient.serve(client_transport).await?;
 
         let tools = client.list_tools(Default::default()).await?;
-        let mut tool_names = tools
-            .tools
-            .iter()
-            .map(|tool| tool.name.to_string())
-            .collect::<Vec<_>>();
+        let mut tool_names = tools.tools.iter().map(|tool| tool.name.to_string()).collect::<Vec<_>>();
         tool_names.sort();
         assert_eq!(tool_names, ["web_fetch", "web_search"]);
         let tool = tools
@@ -461,21 +421,13 @@ mod tests {
     }
 
     fn tool_call(arguments: serde_json::Value) -> CallToolRequestParams {
-        CallToolRequestParams::new("web_search").with_arguments(
-            arguments
-                .as_object()
-                .expect("tool arguments are an object")
-                .clone(),
-        )
+        CallToolRequestParams::new("web_search")
+            .with_arguments(arguments.as_object().expect("tool arguments are an object").clone())
     }
 
     fn fetch_tool_call(arguments: serde_json::Value) -> CallToolRequestParams {
-        CallToolRequestParams::new("web_fetch").with_arguments(
-            arguments
-                .as_object()
-                .expect("tool arguments are an object")
-                .clone(),
-        )
+        CallToolRequestParams::new("web_fetch")
+            .with_arguments(arguments.as_object().expect("tool arguments are an object").clone())
     }
 
     fn fetch_fixture(responses: Vec<String>) -> (String, FetchService, thread::JoinHandle<()>) {
@@ -485,9 +437,7 @@ mod tests {
             for response in responses {
                 let (mut stream, _) = listener.accept().expect("accept request");
                 read_request(&mut stream);
-                stream
-                    .write_all(response.as_bytes())
-                    .expect("write response");
+                stream.write_all(response.as_bytes()).expect("write response");
             }
         });
         let client = Client::builder()

@@ -17,10 +17,7 @@ pub(crate) fn color_enabled(no_color: bool) -> bool {
 }
 
 pub(crate) fn status_enabled() -> bool {
-    can_show_status(
-        io::stderr().is_terminal(),
-        std::env::var_os("TERM").as_deref(),
-    )
+    can_show_status(io::stderr().is_terminal(), std::env::var_os("TERM").as_deref())
 }
 
 fn can_color(no_color: bool, stdout_is_terminal: bool, term: Option<&OsStr>) -> bool {
@@ -56,11 +53,7 @@ where
     Ok(())
 }
 
-pub(crate) fn write_human_search<W>(
-    writer: &mut W,
-    response: &SearchResponse,
-    color: bool,
-) -> io::Result<()>
+pub(crate) fn write_human_search<W>(writer: &mut W, response: &SearchResponse, color: bool) -> io::Result<()>
 where
     W: Write,
 {
@@ -86,11 +79,7 @@ where
     Ok(())
 }
 
-pub(crate) fn write_human_fetch<W>(
-    writer: &mut W,
-    response: &FetchResponse,
-    color: bool,
-) -> io::Result<()>
+pub(crate) fn write_human_fetch<W>(writer: &mut W, response: &FetchResponse, color: bool) -> io::Result<()>
 where
     W: Write,
 {

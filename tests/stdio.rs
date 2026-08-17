@@ -96,9 +96,7 @@ fn stdio_server_stops_promptly_on_sigterm() {
     .expect("send initialize request");
     let mut stdout = BufReader::new(child.stdout.take().expect("server stdout"));
     let mut response = String::new();
-    stdout
-        .read_line(&mut response)
-        .expect("read initialize response");
+    stdout.read_line(&mut response).expect("read initialize response");
     assert!(serde_json::from_str::<Value>(&response).is_ok());
 
     let status = Command::new("kill")

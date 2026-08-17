@@ -4,6 +4,8 @@ pub mod web;
 
 use std::{io, process::ExitCode};
 
+use anyhow::Context;
+
 use clap::Parser;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -11,10 +13,12 @@ use tracing_subscriber::{fmt::MakeWriter, prelude::*};
 
 use crate::{cli::Command, config::Config};
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 enum AppError {
+    #[error("{0}")]
     Usage(String),
-    Runtime(String),
+    #[error(transparent)]
+    Runtime(#[from] anyhow::Error),
 }
 
 impl AppError {
@@ -22,22 +26,10 @@ impl AppError {
         Self::Usage(message.into())
     }
 
-    fn runtime(message: impl Into<String>) -> Self {
-        Self::Runtime(message.into())
-    }
-
     fn exit_code(&self) -> ExitCode {
         match self {
             Self::Usage(_) => ExitCode::from(2),
             Self::Runtime(_) => ExitCode::FAILURE,
-        }
-    }
-}
-
-impl std::fmt::Display for AppError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Usage(message) | Self::Runtime(message) => formatter.write_str(message),
         }
     }
 }
@@ -59,7 +51,7 @@ pub async fn run() -> ExitCode {
     };
 
     if let Err(error) = init_tracing(config.log_level) {
-        return report_error(error);
+        return report_error(error.into());
     }
 
     tracing::debug!(
@@ -84,9 +76,9 @@ fn report_error(error: AppError) -> ExitCode {
     error.exit_code()
 }
 
-fn init_tracing(level: tracing_subscriber::filter::LevelFilter) -> Result<(), AppError> {
+fn init_tracing(level: tracing_subscriber::filter::LevelFilter) -> anyhow::Result<()> {
     tracing::subscriber::set_global_default(make_subscriber(level, io::stderr))
-        .map_err(|error| AppError::runtime(format!("could not initialize diagnostics: {error}")))
+        .context("could not initialize diagnostics")
 }
 
 fn make_subscriber<W>(

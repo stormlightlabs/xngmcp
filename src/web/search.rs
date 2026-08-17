@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt, time::Duration};
+use std::{collections::HashSet, time::Duration};
 
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -160,13 +160,19 @@ pub struct UnavailableEngine {
 }
 
 /// Failures from input validation or the SearXNG backend.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum SearchError {
+    #[error("invalid search request: {0}")]
     Validation(String),
+    #[error("search was cancelled")]
     Cancelled,
+    #[error("SearXNG did not respond before the search deadline")]
     Timeout,
+    #[error("SearXNG returned HTTP {0}; check that the backend is healthy")]
     Backend(StatusCode),
+    #[error("SearXNG returned an invalid JSON search response")]
     MalformedResponse,
+    #[error("could not reach SearXNG; check the configured backend URL")]
     Transport,
 }
 
@@ -175,31 +181,6 @@ impl SearchError {
         Self::Validation(message.into())
     }
 }
-
-impl fmt::Display for SearchError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Validation(message) => write!(formatter, "invalid search request: {message}"),
-            Self::Cancelled => formatter.write_str("search was cancelled"),
-            Self::Timeout => {
-                formatter.write_str("SearXNG did not respond before the search deadline")
-            }
-            Self::Backend(status) => write!(
-                formatter,
-                "SearXNG returned HTTP {}; check that the backend is healthy",
-                status.as_u16()
-            ),
-            Self::MalformedResponse => {
-                formatter.write_str("SearXNG returned an invalid JSON search response")
-            }
-            Self::Transport => {
-                formatter.write_str("could not reach SearXNG; check the configured backend URL")
-            }
-        }
-    }
-}
-
-impl std::error::Error for SearchError {}
 
 /// Reusable asynchronous client for the configured SearXNG JSON endpoint.
 #[derive(Clone, Debug)]

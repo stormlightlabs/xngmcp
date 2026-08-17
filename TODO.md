@@ -154,36 +154,36 @@ public HTTP(S) URL while preventing access to local networks.
 
 **Work:**
 
-- [ ] Define the fetch request and result types, including final URL, title,
+- [x] Define the fetch request and result types, including final URL, title,
   content type, content, and truncation state.
-- [ ] Add `lectito` from its released crates.io package plus only the charset
+- [x] Add `lectito` from its released crates.io package plus only the charset
   and HTTP connector dependencies needed by the implementation; do not use a
   local path or Git dependency.
-- [ ] Validate URL scheme, output format, and `max_chars`; apply documented
+- [x] Validate URL scheme, output format, and `max_chars`; apply documented
   defaults in the fetch service.
-- [ ] Resolve hosts, reject all blocked IPv4 and IPv6 ranges, and dial only the
+- [x] Resolve hosts, reject all blocked IPv4 and IPv6 ranges, and dial only the
   validated address.
-- [ ] Repeat host validation on redirects and enforce redirect, connect,
+- [x] Repeat host validation on redirects and enforce redirect, connect,
   response-header, operation, and decompressed-body limits.
-- [ ] Decode supported charsets and pass the HTML string and final URL to
+- [x] Decode supported charsets and pass the HTML string and final URL to
   `lectito::extract`; select its Markdown or plain-text field, preserve its
   title and relevant metadata, and pass plain-text HTTP responses through.
-- [ ] Treat Lectito's no-readable-article result and extraction errors as
+- [x] Treat Lectito's no-readable-article result and extraction errors as
   actionable application errors; do not fall back to returning unfiltered HTML.
-- [ ] Truncate on Unicode boundaries and reject binary or unsupported media with
+- [x] Truncate on Unicode boundaries and reject binary or unsupported media with
   an actionable error.
-- [ ] Ensure requests never forward credentials or cookies.
+- [x] Ensure requests never forward credentials or cookies.
 
 **Acceptance criteria:**
 
-- [ ] Direct, DNS-resolved, redirected, IPv4-mapped IPv6, and rebinding attempts
+- [x] Direct, DNS-resolved, redirected, IPv4-mapped IPv6, and rebinding attempts
   cannot reach blocked addresses.
-- [ ] Oversized or slow responses stop at the configured limit and respect
+- [x] Oversized or slow responses stop at the configured limit and respect
   cancellation.
-- [ ] Article HTML, non-UTF-8 HTML, and plain text produce the documented result
+- [x] Article HTML, non-UTF-8 HTML, and plain text produce the documented result
   shape; navigation-only HTML returns an extraction error.
-- [ ] Adversarial tests cover every blocked address class and redirect hop.
-- [ ] Tests use fixed HTML fixtures to prove Lectito Markdown/text selection,
+- [x] Adversarial tests cover every blocked address class and redirect hop.
+- [x] Tests use fixed HTML fixtures to prove Lectito Markdown/text selection,
   title propagation, Unicode-safe truncation, and no-article handling.
 
 **Verification:** `cargo test fetch`

@@ -12,7 +12,6 @@
   "files": [
     "extensions",
     "skills",
-    "examples",
     "README.md"
   ],
   "pi": {
@@ -30,10 +29,10 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.2",
+    "@earendil-works/pi-coding-agent": "1.4.0",
     "typescript": "5.9.3"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.19"
   }
 }

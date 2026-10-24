@@ -1,81 +1,53 @@
 # xngmcp for Pi
 
-This package gives Pi guidance for xngmcp's `web_search` and `web_fetch` MCP
-tools. It does not run a web client or an MCP server. `pi-mcp-adapter` starts
-`xngmcp serve` and exposes the two tools directly in Pi.
+This package helps Pi use xngmcp's web search and page fetch tools. Pi 1.x
+connects to the MCP server directly; you don't need an MCP adapter.
 
-## Install
+## Install for every Pi project
 
-From an xngmcp source checkout, install the binary and start the local SearXNG
-stack:
+Install the binary and start the local SearXNG backend from the repository root:
 
 ```sh
-cargo install --path .
+cargo install --path . --locked
 ./infra/searxng/bootstrap.sh
 docker compose --env-file infra/searxng/.env \
   -f infra/searxng/compose.yaml up -d --wait
 ```
 
-Install the adapter and this package:
+Add the server to your personal Pi configuration. Use the absolute path to the
+installed binary so Pi can start it even when its `PATH` differs from your shell:
 
 ```sh
-pi install npm:pi-mcp-adapter
-pi install npm:pi-plugin-xngmcp
+pi mcp add web --exposure direct \
+  --description 'Search the public web and fetch readable pages using local xngmcp' \
+  --env SEARXNG_URL=http://127.0.0.1:8080 \
+  -- "$(command -v xngmcp)" serve
+pi install ./packages/pi-plugin-xngmcp
 ```
 
-Check that the binary and backend are ready:
+Run these commands without `--local`: they configure `~/.pi/agent/mcp.json` and
+`~/.pi/agent/settings.json` for all your Pi projects. The package is loaded
+from this checkout, so keep it in place. Restart Pi or run `/reload` in an
+existing session after installing it.
+
+Pi exposes the tools as `mcp__web__web_search` and `mcp__web__web_fetch`.
+The package adds brief guidance when both tools are active. You can also use
+`/skill:xngmcp` for detailed instructions.
+
+## Check the setup
 
 ```sh
-command -v xngmcp
-curl --fail --silent --show-error http://127.0.0.1:8080/healthz >/dev/null
+curl --fail --silent --show-error http://127.0.0.1:8080/healthz
+xngmcp search --limit 2 'Rust programming language'
+pi mcp list
+pi list
 ```
 
-## Configure a project
+`pi mcp list` must show `web` connected with two direct tools. In an open Pi
+session, run `/mcp` to inspect the connection. If the backend is down, start
+Docker and rerun the Compose command above; Pi remains usable, but searches
+will fail until SearXNG is available.
 
-Create `.mcp.json` in the project root with this configuration. The package
-also includes it as `examples/.mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "web": {
-      "command": "xngmcp",
-      "args": ["serve"],
-      "env": {
-        "SEARXNG_URL": "http://127.0.0.1:8080"
-      },
-      "directTools": ["web_search", "web_fetch"],
-      "toolPrefix": "none"
-    }
-  }
-}
-```
-
-`toolPrefix: "none"` preserves the MCP names, so Pi shows `web_search` and
-`web_fetch` beside its built-in tools. The adapter is otherwise responsible for
-MCP discovery, connection management, and diagnostics.
-
-Start Pi from the configured project. On a new Pi agent directory, populate the
-adapter cache and reload the session:
-
-```text
-/mcp reconnect web
-/reload
-```
-
-Open `/mcp` to confirm that `web` is connected and both tools are direct. Ask a
-normal current-information question. Pi should search, select a relevant public
-result, and fetch it with a proportionate `max_chars` limit.
-
-## Diagnose a failed setup
-
-| Symptom                          | Check                                                                                                          |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Package is absent                | `pi list`, then install `pi-mcp-adapter` and `pi-plugin-xngmcp`.                                               |
-| `xngmcp` will not start          | Run `command -v xngmcp`; put the installed binary on `PATH`.                                                   |
-| Tools are missing or stale       | Run `/mcp reconnect web`, then `/reload`.                                                                      |
-| Server launch failed             | Open `/mcp`. Set `"debug": true` on `web` temporarily, reconnect, and inspect the displayed stderr.            |
-| Search backend cannot be reached | Run the health check, verify `SEARXNG_URL`, and reconnect. Pi reports this as a tool error and remains usable. |
-
-Use the `/mcp` panel for connection and tool diagnostics rather than adding a
-second xngmcp interface.
+If you use a different SearXNG port, update `SEARXNG_URL` in the `pi mcp add`
+command and in the health check. See the [SearXNG guide](../../infra/searxng/README.md)
+for operations and troubleshooting.

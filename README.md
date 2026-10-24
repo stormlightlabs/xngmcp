@@ -31,10 +31,10 @@ install the generated man pages and shell completions.
 
 ## Pi
 
-Install and configure the Pi package with its
-[setup guide](packages/pi-plugin-xngmcp/README.md). It configures
-`pi-mcp-adapter` to run `xngmcp serve` and exposes `web_search` and `web_fetch`
-as direct Pi tools.
+Install and configure xngmcp for all Pi projects with the
+[setup guide](packages/pi-plugin-xngmcp/README.md). Pi's built-in MCP support
+runs `xngmcp serve` and exposes `mcp__web__web_search` and
+`mcp__web__web_fetch` as direct tools.
 
 ## Usage
 
